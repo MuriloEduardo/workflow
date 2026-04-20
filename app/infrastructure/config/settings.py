@@ -21,5 +21,8 @@ class Settings(BaseSettings):
 
     session_timeout_seconds: int = 1800
 
+    http_host: str = "0.0.0.0"
+    http_port: int = 80
+
     app_name: str = "workflow"
     log_level: str = "INFO"
