@@ -51,6 +51,7 @@ class ChannelInboundHandler(MessageHandler):
                 "session_id": session.session_id,
                 "thread_id": session.thread_id,
                 "tenant_id": tenant_id,
+                **({"media_url": inbound.media_url} if inbound.media_url else {}),
             },
         )
         logger.info(

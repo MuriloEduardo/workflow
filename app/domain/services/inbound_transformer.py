@@ -27,6 +27,7 @@ class InboundPayload:
         "message_id",
         "tenant_id",
         "raw",
+        "media_url",
     )
 
     def __init__(
@@ -37,6 +38,7 @@ class InboundPayload:
         message_id: str | None = None,
         tenant_id: str | None = None,
         raw: dict[str, Any] | None = None,
+        media_url: str | None = None,
     ) -> None:
         self.sender_id = sender_id
         self.content = content
@@ -44,6 +46,7 @@ class InboundPayload:
         self.message_id = message_id or uuid.uuid4().hex
         self.tenant_id = tenant_id
         self.raw = raw or {}
+        self.media_url = media_url
 
 
 def _extract_meta_content(msg: dict[str, Any]) -> str:
@@ -95,13 +98,19 @@ def _transform_meta(payload: dict[str, Any]) -> InboundPayload:
                 if not content:
                     continue
 
+                msg_id = msg.get("id")
+                media_url = (
+                    payload.get("_media_urls", {}).get(msg_id) if msg_id else None
+                )
+
                 return InboundPayload(
                     sender_id=wa_id or msg.get("from", "unknown"),
                     content=content,
                     channel_type="whatsapp",
-                    message_id=msg.get("id"),
+                    message_id=msg_id,
                     tenant_id=tenant_id,
                     raw=payload,
+                    media_url=media_url,
                 )
 
     # Fallback: simplified/test payload with a direct "prompt" field
