@@ -20,7 +20,7 @@ class DebounceService:
         self,
         repository: PendingMessageRepository,
         publisher: MessagePublisher,
-        debounce_seconds: float = 5.0,
+        debounce_seconds: float = 10.0,
     ) -> None:
         self._repository = repository
         self._publisher = publisher
