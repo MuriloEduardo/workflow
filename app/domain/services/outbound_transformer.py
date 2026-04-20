@@ -42,14 +42,14 @@ def build_outbound_messages(
     channel = ChannelMetadata(
         channel_type=channel_type,
         recipient_id=(
-            original.get("sender_id")
-            or (
-                cognition_response.context.session_id
-                if cognition_response.context
-                else None
-            )
-            or "unknown"
-        ),
+            (s := original.get("sender_id")) if s and s != "unknown" else None
+        )
+        or (
+            cognition_response.context.session_id
+            if cognition_response.context
+            else None
+        )
+        or None,
     )
 
     texts = cognition_response.messages or [cognition_response.content]
