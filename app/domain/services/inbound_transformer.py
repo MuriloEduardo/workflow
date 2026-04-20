@@ -46,6 +46,30 @@ class InboundPayload:
         self.raw = raw or {}
 
 
+def _extract_meta_content(msg: dict[str, Any]) -> str:
+    """Extract displayable content from any Meta message type."""
+    msg_type = msg.get("type", "text")
+
+    if msg_type == "text":
+        return (msg.get("text") or {}).get("body", "")
+
+    if msg_type == "location":
+        loc = msg.get("location") or {}
+        parts = [f"📍 {loc.get('latitude')},{loc.get('longitude')}"]
+        if loc.get("name"):
+            parts.append(loc["name"])
+        if loc.get("address"):
+            parts.append(loc["address"])
+        return " — ".join(parts)
+
+    # Media types: image, video, audio, document, sticker
+    media = msg.get(msg_type) or {}
+    if media.get("caption"):
+        return media["caption"]
+
+    return f"[{msg_type}]"
+
+
 def _transform_meta(payload: dict[str, Any]) -> InboundPayload:
     """Extract content from a Meta / WhatsApp Cloud API webhook payload."""
 
@@ -61,8 +85,13 @@ def _transform_meta(payload: dict[str, Any]) -> InboundPayload:
             wa_id = contacts[0].get("wa_id") if contacts else None
 
             for msg in value.get("messages", []):
-                # Skip non-text messages (reactions, status, etc.)
-                content = msg.get("text", {}).get("body", "")
+                msg_type = msg.get("type", "text")
+
+                # Skip reactions and status updates
+                if msg_type in ("reaction", "unsupported"):
+                    continue
+
+                content = _extract_meta_content(msg)
                 if not content:
                     continue
 
