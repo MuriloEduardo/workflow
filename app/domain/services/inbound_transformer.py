@@ -56,6 +56,12 @@ def _extract_meta_content(msg: dict[str, Any]) -> str:
     if msg_type == "text":
         return (msg.get("text") or {}).get("body", "")
 
+    if msg_type == "reaction":
+        reaction = msg.get("reaction") or {}
+        emoji = reaction.get("emoji", "")
+        reacted_id = reaction.get("message_id", "")
+        return f"[reaction:{emoji}:{reacted_id}]"
+
     if msg_type == "location":
         loc = msg.get("location") or {}
         parts = [f"📍 {loc.get('latitude')},{loc.get('longitude')}"]
@@ -90,8 +96,7 @@ def _transform_meta(payload: dict[str, Any]) -> InboundPayload:
             for msg in value.get("messages", []):
                 msg_type = msg.get("type", "text")
 
-                # Skip reactions and status updates
-                if msg_type in ("reaction", "unsupported"):
+                if msg_type == "unsupported":
                     continue
 
                 content = _extract_meta_content(msg)
@@ -104,7 +109,7 @@ def _transform_meta(payload: dict[str, Any]) -> InboundPayload:
                 )
 
                 return InboundPayload(
-                    sender_id=wa_id or msg.get("from", "unknown"),
+                    sender_id=wa_id or msg.get("from", ""),
                     content=content,
                     channel_type="whatsapp",
                     message_id=msg_id,
@@ -114,8 +119,10 @@ def _transform_meta(payload: dict[str, Any]) -> InboundPayload:
                 )
 
     # Fallback: simplified/test payload with a direct "prompt" field
+    sender = payload.get("request_id") or payload.get("sender_id") or "unknown"
+    logger.warning("transform_meta.fallback", sender=sender)
     return InboundPayload(
-        sender_id=payload.get("request_id", "unknown"),
+        sender_id=sender,
         content=payload.get("prompt", ""),
         channel_type="whatsapp",
         message_id=payload.get("request_id", uuid.uuid4().hex),
