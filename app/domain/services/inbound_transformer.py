@@ -103,6 +103,16 @@ def _transform_meta(payload: dict[str, Any]) -> InboundPayload:
                 if not content:
                     continue
 
+                # ── Enrich with quoted message content ──
+                context = msg.get("context") or {}
+                quoted_id = context.get("id")
+                if quoted_id:
+                    quoted_content = (payload.get("_quoted_messages") or {}).get(
+                        quoted_id
+                    )
+                    if quoted_content:
+                        content = f'[Em resposta a: "{quoted_content}"]\n{content}'
+
                 msg_id = msg.get("id")
                 media_url = (
                     payload.get("_media_urls", {}).get(msg_id) if msg_id else None
