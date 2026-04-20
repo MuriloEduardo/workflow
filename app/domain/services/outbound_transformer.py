@@ -66,11 +66,15 @@ def build_outbound_messages(
     texts = cognition_response.messages or [cognition_response.content]
     base_id = cognition_response.request_id
 
+    inbound_msg_id = original.get("message_id")
+    base_meta = {"inbound_message_id": inbound_msg_id} if inbound_msg_id else {}
+
     return [
         OutboundChannelMessage(
             message_id=f"{base_id}-{i}" if len(texts) > 1 else base_id,
             content=text,
             channel=channel,
+            metadata=base_meta,
         )
         for i, text in enumerate(texts)
     ]
