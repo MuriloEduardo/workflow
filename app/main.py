@@ -27,46 +27,32 @@ logger = structlog.get_logger(__name__)
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Automated Customer Service Workflow workers"
+    parser = argparse.ArgumentParser(description="Workflow service")
+    parser.add_argument(
+        "--http",
+        action="store_true",
+        help="Start the HTTP health server.",
     )
     parser.add_argument(
         "--workers",
         nargs="*",
-        default=[],
-        help=f"Workers to start (available: {', '.join(available_workers())}). Empty = all.",
+        default=None,
+        help=f"Start workers (available: {', '.join(available_workers())}). Without names = all.",
     )
     return parser.parse_args()
 
 
 def create_health_app() -> FastAPI:
-    app = FastAPI(title="Workflow Service")
+    health_app = FastAPI(title="Workflow Service")
 
-    @app.get("/health")
+    @health_app.get("/health")
     async def health() -> dict:
         return {"status": "ok", "service": "workflow"}
 
-    return app
+    return health_app
 
 
-async def main() -> None:
-    args = parse_args()
-    container = Container()
-
-    await container.database.connect()
-
-    runner = WorkerRunner(container)
-    await runner.start(*args.workers)
-
-    flush_worker = DebounceFlushWorker(
-        debounce=container.debounce_service,
-        poll_interval=container.settings.debounce_poll_interval,
-    )
-    flush_task = asyncio.create_task(flush_worker.start())
-
-    names = args.workers or available_workers()
-    logger.info("workers.running", workers=[*names, "debounce_flush"])
-
+async def run_http(container: Container) -> None:
     settings = container.settings
     config = uvicorn.Config(
         create_health_app(),
@@ -75,19 +61,53 @@ async def main() -> None:
         log_level=settings.log_level.lower(),
     )
     server = uvicorn.Server(config)
+    await server.serve()
 
+
+async def run_workers(container: Container, names: list[str]) -> None:
+    await container.database.connect()
+
+    runner = WorkerRunner(container)
+    await runner.start(*names)
+
+    flush_worker = DebounceFlushWorker(
+        debounce=container.debounce_service,
+        poll_interval=container.settings.debounce_poll_interval,
+    )
+    asyncio.create_task(flush_worker.start())
+
+    resolved = names or available_workers()
+    logger.info("workers.running", workers=[*resolved, "debounce_flush"])
+
+
+async def main() -> None:
+    args = parse_args()
+
+    if not args.http and args.workers is None:
+        logger.error("Specify at least --http or --workers")
+        return
+
+    container = Container()
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, stop.set)
 
-    http_task = asyncio.create_task(server.serve())
+    tasks: list[asyncio.Task] = []
 
-    await stop.wait()
-    server.should_exit = True
-    await http_task
-    flush_worker.stop()
-    flush_task.cancel()
+    if args.workers is not None:
+        worker_names = args.workers if args.workers else []
+        tasks.append(asyncio.create_task(run_workers(container, worker_names)))
+
+    if args.http:
+        tasks.append(asyncio.create_task(run_http(container)))
+
+    if not args.http:
+        await stop.wait()
+
+    if tasks:
+        await asyncio.gather(*tasks)
+
     await container.shutdown()
     logger.info("shutdown.complete")
 
