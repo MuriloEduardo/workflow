@@ -41,57 +41,63 @@ class DebounceService:
             messages = await self._repository.flush_group(group_key)
             if not messages:
                 continue
-
-            combined_content = "\n".join(m["content"] for m in messages)
-            first_meta = messages[0]["metadata"]
-            session_id = first_meta.get("session_id", group_key)
-            thread_id = first_meta.get("thread_id", session_id)
-
-            flow_state: dict = {}
-            if self._execution_repo:
-                flow = await self._execution_repo.get_session_flow(thread_id)
-                if flow:
-                    last = flow[-1]
-                    flow_state = {
-                        "current_node_id": last["node_id"],
-                        "incoming_edge": (
-                            {
-                                "id": last["incoming_edge_id"],
-                                "label": last["incoming_edge_label"],
-                                "condition_prompt": last["incoming_edge_condition"],
-                            }
-                            if last.get("incoming_edge_id")
-                            else None
-                        ),
-                        "next_edges": last.get("next_edges") or [],
-                    }
-
-            request = CognitionRequest(
-                request_id=str(uuid.uuid4()),
-                prompt=combined_content,
-                context=WorkflowContext(
-                    session_id=thread_id,
-                    state={"flow": flow_state} if flow_state else {},
-                    metadata={
-                        "group_key": group_key,
-                        "message_count": len(messages),
-                        "original_metadata": first_meta,
-                    },
-                ),
-            )
-
-            await self._publisher.publish(
-                message=request.model_dump_json().encode(),
-                routing_key=COGNITION_REQUEST_KEY,
-                exchange_name=COGNITION_EXCHANGE,
-            )
-
-            logger.info(
-                "debounce.flushed",
-                group_key=group_key,
-                message_count=len(messages),
-                request_id=request.request_id,
-            )
+            await self._publish_to_cognition(group_key, messages)
             flushed += 1
 
         return flushed
+
+    async def _publish_to_cognition(self, group_key: str, messages: list[dict]) -> None:
+        combined_content = "\n".join(m["content"] for m in messages)
+        first_meta = messages[0]["metadata"]
+        session_id = first_meta.get("session_id", group_key)
+        thread_id = first_meta.get("thread_id", session_id)
+
+        flow_state = await self._build_flow_state(thread_id)
+
+        request = CognitionRequest(
+            request_id=str(uuid.uuid4()),
+            prompt=combined_content,
+            context=WorkflowContext(
+                session_id=thread_id,
+                state={"flow": flow_state} if flow_state else {},
+                metadata={
+                    "group_key": group_key,
+                    "message_count": len(messages),
+                    "original_metadata": first_meta,
+                },
+            ),
+        )
+
+        await self._publisher.publish(
+            message=request.model_dump_json().encode(),
+            routing_key=COGNITION_REQUEST_KEY,
+            exchange_name=COGNITION_EXCHANGE,
+        )
+
+        logger.info(
+            "debounce.flushed",
+            group_key=group_key,
+            message_count=len(messages),
+            request_id=request.request_id,
+        )
+
+    async def _build_flow_state(self, session_id: str) -> dict:
+        if not self._execution_repo:
+            return {}
+        flow = await self._execution_repo.get_session_flow(session_id)
+        if not flow:
+            return {}
+        last = flow[-1]
+        return {
+            "current_node_id": last["node_id"],
+            "incoming_edge": (
+                {
+                    "id": last["incoming_edge_id"],
+                    "label": last["incoming_edge_label"],
+                    "condition_prompt": last["incoming_edge_condition"],
+                }
+                if last.get("incoming_edge_id")
+                else None
+            ),
+            "next_edges": last.get("next_edges") or [],
+        }
