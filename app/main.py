@@ -72,6 +72,7 @@ async def run_workers(container: Container, names: list[str]) -> None:
 
     flush_worker = DebounceFlushWorker(
         debounce=container.debounce_service,
+        database=container.database,
         poll_interval=container.settings.debounce_poll_interval,
     )
     asyncio.create_task(flush_worker.start())
