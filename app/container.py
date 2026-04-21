@@ -7,9 +7,11 @@ from app.adapters.outbound.postgres.pending_message_repo import (
     PostgresPendingMessageRepository,
 )
 from app.adapters.outbound.postgres.session_repo import PostgresSessionRepository
+from app.adapters.outbound.postgres.tenant_repo import PostgresTenantRepository
 from app.domain.services.debounce import DebounceService
 from app.domain.services.session import SessionService
 from app.ports.outbound.execution_repository import ExecutionRepository
+from app.ports.outbound.tenant_repository import TenantRepository
 from app.infrastructure.config.settings import Settings
 from app.infrastructure.database.postgres_connection import PostgresConnection
 from app.infrastructure.messaging.rabbitmq_connection import RabbitMQConnection
@@ -27,6 +29,7 @@ class Container:
         self._debounce_service: DebounceService | None = None
         self._session_service: SessionService | None = None
         self._execution_repo: ExecutionRepository | None = None
+        self._tenant_repo: TenantRepository | None = None
 
     @property
     def connection(self) -> RabbitMQConnection:
@@ -64,11 +67,18 @@ class Container:
         return self._execution_repo
 
     @property
+    def tenant_repo(self) -> TenantRepository:
+        if self._tenant_repo is None:
+            self._tenant_repo = PostgresTenantRepository(self.database)
+        return self._tenant_repo
+
+    @property
     def session_service(self) -> SessionService:
         if self._session_service is None:
             repo = PostgresSessionRepository(self.database)
             self._session_service = SessionService(
                 repository=repo,
+                tenant_repository=self.tenant_repo,
                 default_timeout=self.settings.session_timeout_seconds,
             )
         return self._session_service

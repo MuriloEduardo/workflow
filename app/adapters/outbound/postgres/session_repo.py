@@ -9,7 +9,7 @@ class PostgresSessionRepository(SessionRepository):
         self._database = database
 
     async def get_active(
-        self, tenant_id: str, channel_type: str, sender_id: str
+        self, tenant_id: UUID, channel_type: str, contact_id: UUID
     ) -> dict | None:
         pool = await self._database.get_pool()
         row = await pool.fetchrow(
@@ -19,12 +19,12 @@ class PostgresSessionRepository(SessionRepository):
             FROM sessions
             WHERE tenant_id = $1
               AND channel_type = $2
-              AND sender_id = $3
+              AND contact_id = $3
               AND status = 'active'
             """,
             tenant_id,
             channel_type,
-            sender_id,
+            contact_id,
         )
         if row is None:
             return None
@@ -32,22 +32,22 @@ class PostgresSessionRepository(SessionRepository):
 
     async def create(
         self,
-        tenant_id: str,
+        tenant_id: UUID,
         channel_type: str,
-        sender_id: str,
+        contact_id: UUID,
         thread_id: str,
         timeout_seconds: int,
     ) -> UUID:
         pool = await self._database.get_pool()
         return await pool.fetchval(
             """
-            INSERT INTO sessions (tenant_id, channel_type, sender_id, thread_id, timeout_seconds)
+            INSERT INTO sessions (tenant_id, channel_type, contact_id, thread_id, timeout_seconds)
             VALUES ($1, $2, $3, $4, $5)
             RETURNING id
             """,
             tenant_id,
             channel_type,
-            sender_id,
+            contact_id,
             thread_id,
             timeout_seconds,
         )

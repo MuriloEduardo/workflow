@@ -5,16 +5,16 @@ from uuid import UUID
 class SessionRepository(ABC):
     @abstractmethod
     async def get_active(
-        self, tenant_id: str, channel_type: str, sender_id: str
+        self, tenant_id: UUID, channel_type: str, contact_id: UUID
     ) -> dict | None:
         raise NotImplementedError
 
     @abstractmethod
     async def create(
         self,
-        tenant_id: str,
+        tenant_id: UUID,
         channel_type: str,
-        sender_id: str,
+        contact_id: UUID,
         thread_id: str,
         timeout_seconds: int,
     ) -> UUID:
