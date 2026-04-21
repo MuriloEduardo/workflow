@@ -18,7 +18,7 @@ class PropertyCreate(BaseModel):
     description: str | None = None
     required: bool = False
     default_value: Any | None = None
-    schema: dict[str, Any] = {}
+    json_schema: dict[str, Any] = {}
     metadata: dict[str, Any] = {}
 
 
@@ -28,7 +28,7 @@ class PropertyUpdate(BaseModel):
     description: str | None = None
     required: bool | None = None
     default_value: Any | None = None
-    schema: dict[str, Any] | None = None
+    json_schema: dict[str, Any] | None = None
     metadata: dict[str, Any] | None = None
 
 
@@ -54,7 +54,7 @@ async def create_property(body: PropertyCreate, repo=Depends(_repo)):
         description=body.description,
         required=body.required,
         default_value=body.default_value,
-        schema=body.schema,
+        schema=body.json_schema,
         metadata=body.metadata,
     )
     return await repo.get(UUID(str(prop_id)))
@@ -76,6 +76,8 @@ async def get_property(property_id: UUID, repo=Depends(_repo)):
 @router.patch("/{property_id}")
 async def update_property(property_id: UUID, body: PropertyUpdate, repo=Depends(_repo)):
     fields = body.model_dump(exclude_none=True)
+    if "json_schema" in fields:
+        fields["schema"] = fields.pop("json_schema")
     prop = await repo.update(property_id, fields)
     if prop is None:
         raise HTTPException(status_code=404, detail="Property not found")
