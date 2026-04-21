@@ -70,8 +70,7 @@ class PostgresExecutionRepository(ExecutionRepository):
                 SELECT
                     id, node_id, status, response, model,
                     total_tokens, latency_ms, error, created_at,
-                    LAG(node_id)  OVER (ORDER BY created_at) AS prev_node_id,
-                    LEAD(node_id) OVER (ORDER BY created_at) AS next_node_id
+                    LAG(node_id) OVER (ORDER BY created_at) AS prev_node_id
                 FROM executions
                 WHERE session_id = $1 AND node_id IS NOT NULL
             )
@@ -85,19 +84,25 @@ class PostgresExecutionRepository(ExecutionRepository):
                 o.latency_ms,
                 o.error,
                 o.created_at,
-                e_in.id            AS incoming_edge_id,
-                e_in.label         AS incoming_edge_label,
+                e_in.id               AS incoming_edge_id,
+                e_in.label            AS incoming_edge_label,
                 e_in.condition_prompt AS incoming_edge_condition,
-                e_out.id           AS outgoing_edge_id,
-                e_out.label        AS outgoing_edge_label,
-                e_out.condition_prompt AS outgoing_edge_condition
+                (
+                    SELECT json_agg(
+                        json_build_object(
+                            'id',             e.id,
+                            'target_node_id', e.target_node_id,
+                            'label',          e.label,
+                            'condition_prompt', e.condition_prompt,
+                            'priority',       e.priority
+                        ) ORDER BY e.priority, e.created_at
+                    )
+                    FROM edges e WHERE e.source_node_id = o.node_id
+                ) AS next_edges
             FROM ordered o
             LEFT JOIN edges e_in
                 ON e_in.source_node_id = o.prev_node_id
                AND e_in.target_node_id = o.node_id
-            LEFT JOIN edges e_out
-                ON e_out.source_node_id = o.node_id
-               AND e_out.target_node_id = o.next_node_id
             ORDER BY o.created_at
             """,
             session_id,
@@ -110,7 +115,5 @@ class PostgresExecutionRepository(ExecutionRepository):
             d["created_at"] = d["created_at"].isoformat()
             if d["incoming_edge_id"]:
                 d["incoming_edge_id"] = str(d["incoming_edge_id"])
-            if d["outgoing_edge_id"]:
-                d["outgoing_edge_id"] = str(d["outgoing_edge_id"])
             result.append(d)
         return result
