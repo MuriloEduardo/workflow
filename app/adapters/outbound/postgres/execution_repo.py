@@ -61,3 +61,56 @@ class PostgresExecutionRepository(ExecutionRepository):
             error,
             json.dumps(metadata or {}),
         )
+
+    async def get_session_flow(self, session_id: str) -> list[dict]:
+        pool = await self._database.get_pool()
+        rows = await pool.fetch(
+            """
+            WITH ordered AS (
+                SELECT
+                    id, node_id, status, response, model,
+                    total_tokens, latency_ms, error, created_at,
+                    LAG(node_id)  OVER (ORDER BY created_at) AS prev_node_id,
+                    LEAD(node_id) OVER (ORDER BY created_at) AS next_node_id
+                FROM executions
+                WHERE session_id = $1 AND node_id IS NOT NULL
+            )
+            SELECT
+                o.id,
+                o.node_id,
+                o.status,
+                o.response,
+                o.model,
+                o.total_tokens,
+                o.latency_ms,
+                o.error,
+                o.created_at,
+                e_in.id            AS incoming_edge_id,
+                e_in.label         AS incoming_edge_label,
+                e_in.condition_prompt AS incoming_edge_condition,
+                e_out.id           AS outgoing_edge_id,
+                e_out.label        AS outgoing_edge_label,
+                e_out.condition_prompt AS outgoing_edge_condition
+            FROM ordered o
+            LEFT JOIN edges e_in
+                ON e_in.source_node_id = o.prev_node_id
+               AND e_in.target_node_id = o.node_id
+            LEFT JOIN edges e_out
+                ON e_out.source_node_id = o.node_id
+               AND e_out.target_node_id = o.next_node_id
+            ORDER BY o.created_at
+            """,
+            session_id,
+        )
+        result = []
+        for r in rows:
+            d = dict(r)
+            d["id"] = str(d["id"])
+            d["node_id"] = str(d["node_id"])
+            d["created_at"] = d["created_at"].isoformat()
+            if d["incoming_edge_id"]:
+                d["incoming_edge_id"] = str(d["incoming_edge_id"])
+            if d["outgoing_edge_id"]:
+                d["outgoing_edge_id"] = str(d["outgoing_edge_id"])
+            result.append(d)
+        return result

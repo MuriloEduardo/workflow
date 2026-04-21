@@ -23,3 +23,12 @@ class ExecutionRepository(ABC):
         metadata: dict | None = None,
     ) -> UUID:
         raise NotImplementedError
+
+    @abstractmethod
+    async def get_session_flow(self, session_id: str) -> list[dict]:
+        """
+        Returns executions for a session ordered by time, each annotated with
+        incoming_edge (edge that came from the previous node) and
+        outgoing_edge (edge that leads to the next node).
+        """
+        raise NotImplementedError

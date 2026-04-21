@@ -6,6 +6,11 @@ import structlog
 import uvicorn
 from fastapi import FastAPI
 
+from app.adapters.inbound.http.conditions_router import router as conditions_router
+from app.adapters.inbound.http.edges_router import router as edges_router
+from app.adapters.inbound.http.executions_router import router as executions_router
+from app.adapters.inbound.http.nodes_router import router as nodes_router
+from app.adapters.inbound.http.properties_router import router as properties_router
 from app.container import Container
 from app.workers import available_workers
 from app.workers.debounce_flush import DebounceFlushWorker
@@ -43,11 +48,6 @@ def parse_args() -> argparse.Namespace:
 
 
 def create_app(container: Container) -> FastAPI:
-    from app.adapters.inbound.http.nodes_router import router as nodes_router
-    from app.adapters.inbound.http.edges_router import router as edges_router
-    from app.adapters.inbound.http.conditions_router import router as conditions_router
-    from app.adapters.inbound.http.properties_router import router as properties_router
-
     app = FastAPI(title="Workflow Service")
     app.state.container = container
 
@@ -59,6 +59,7 @@ def create_app(container: Container) -> FastAPI:
     app.include_router(edges_router)
     app.include_router(conditions_router)
     app.include_router(properties_router)
+    app.include_router(executions_router)
 
     return app
 
