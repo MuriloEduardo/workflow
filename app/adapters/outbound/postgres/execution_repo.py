@@ -119,4 +119,19 @@ class PostgresExecutionRepository(ExecutionRepository):
         d["node_id"] = str(d["node_id"])
         if d["incoming_edge_id"]:
             d["incoming_edge_id"] = str(d["incoming_edge_id"])
+        if isinstance(d.get("next_edges"), str):
+            import json as _json
+
+            try:
+                d["next_edges"] = _json.loads(d["next_edges"])
+            except (_json.JSONDecodeError, TypeError):
+                d["next_edges"] = []
+        if not d.get("next_edges"):
+            d["next_edges"] = []
+        # Stringify UUID fields inside next_edges
+        for edge in d["next_edges"]:
+            if isinstance(edge, dict):
+                for key in ("id", "target_node_id"):
+                    if edge.get(key) is not None:
+                        edge[key] = str(edge[key])
         return d
