@@ -14,4 +14,7 @@ from app.workers import worker
 def create_cognition_response_handler(
     container: Container,
 ) -> CognitionResponseHandler:
-    return CognitionResponseHandler(publisher=container.publisher)
+    return CognitionResponseHandler(
+        publisher=container.publisher,
+        execution_repo=container.execution_repo,
+    )

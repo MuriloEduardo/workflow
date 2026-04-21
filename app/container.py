@@ -2,12 +2,14 @@ import structlog
 
 from app.adapters.inbound.amqp.consumer import RabbitMQConsumer
 from app.adapters.outbound.amqp.publisher import RabbitMQPublisher
+from app.adapters.outbound.postgres.execution_repo import PostgresExecutionRepository
 from app.adapters.outbound.postgres.pending_message_repo import (
     PostgresPendingMessageRepository,
 )
 from app.adapters.outbound.postgres.session_repo import PostgresSessionRepository
 from app.domain.services.debounce import DebounceService
 from app.domain.services.session import SessionService
+from app.ports.outbound.execution_repository import ExecutionRepository
 from app.infrastructure.config.settings import Settings
 from app.infrastructure.database.postgres_connection import PostgresConnection
 from app.infrastructure.messaging.rabbitmq_connection import RabbitMQConnection
@@ -24,6 +26,7 @@ class Container:
         self._database: PostgresConnection | None = None
         self._debounce_service: DebounceService | None = None
         self._session_service: SessionService | None = None
+        self._execution_repo: ExecutionRepository | None = None
 
     @property
     def connection(self) -> RabbitMQConnection:
@@ -53,6 +56,12 @@ class Container:
                 debounce_seconds=self.settings.debounce_seconds,
             )
         return self._debounce_service
+
+    @property
+    def execution_repo(self) -> ExecutionRepository:
+        if self._execution_repo is None:
+            self._execution_repo = PostgresExecutionRepository(self.database)
+        return self._execution_repo
 
     @property
     def session_service(self) -> SessionService:
