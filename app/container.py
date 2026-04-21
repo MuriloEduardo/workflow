@@ -69,6 +69,7 @@ class Container:
                 repository=repo,
                 publisher=self.publisher,
                 debounce_seconds=self.settings.debounce_seconds,
+                execution_repo=self.execution_repo,
             )
         return self._debounce_service
 
