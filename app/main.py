@@ -42,20 +42,32 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def create_health_app() -> FastAPI:
-    health_app = FastAPI(title="Workflow Service")
+def create_app(container: Container) -> FastAPI:
+    from app.adapters.inbound.http.nodes_router import router as nodes_router
+    from app.adapters.inbound.http.edges_router import router as edges_router
+    from app.adapters.inbound.http.conditions_router import router as conditions_router
+    from app.adapters.inbound.http.properties_router import router as properties_router
 
-    @health_app.get("/health")
+    app = FastAPI(title="Workflow Service")
+    app.state.container = container
+
+    @app.get("/health")
     async def health() -> dict:
         return {"status": "ok", "service": "workflow"}
 
-    return health_app
+    app.include_router(nodes_router)
+    app.include_router(edges_router)
+    app.include_router(conditions_router)
+    app.include_router(properties_router)
+
+    return app
 
 
 async def run_http(container: Container) -> None:
     settings = container.settings
+    await container.database.connect()
     config = uvicorn.Config(
-        create_health_app(),
+        create_app(container),
         host=settings.http_host,
         port=settings.http_port,
         log_level=settings.log_level.lower(),
