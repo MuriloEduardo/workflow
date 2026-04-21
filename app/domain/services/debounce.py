@@ -41,12 +41,18 @@ class DebounceService:
             messages = await self._repository.flush_group(group_key)
             if not messages:
                 continue
-            await self._publish_to_cognition(group_key, messages)
+            request_id = await self._publish_to_cognition(group_key, messages)
+            logger.info(
+                "debounce.flushed",
+                group_key=group_key,
+                message_count=len(messages),
+                request_id=request_id,
+            )
             flushed += 1
 
         return flushed
 
-    async def _publish_to_cognition(self, group_key: str, messages: list[dict]) -> None:
+    async def _publish_to_cognition(self, group_key: str, messages: list[dict]) -> str:
         combined_content = "\n".join(m["content"] for m in messages)
         first_meta = messages[0]["metadata"]
         session_id = first_meta.get("session_id", group_key)
@@ -74,12 +80,7 @@ class DebounceService:
             exchange_name=COGNITION_EXCHANGE,
         )
 
-        logger.info(
-            "debounce.flushed",
-            group_key=group_key,
-            message_count=len(messages),
-            request_id=request.request_id,
-        )
+        return request.request_id
 
     async def _build_flow_state(self, session_id: str) -> dict:
         if not self._execution_repo:
