@@ -54,6 +54,9 @@ class CognitionResponse(BaseModel):
     tokens_used: int | None = None
     error: str | None = None
     context: WorkflowContext | None = None
+    selected_edge_id: str | None = None
+    justification: str | None = None
+    confidence: float | None = None
 
 
 class InboundChannelMessage(BaseModel):

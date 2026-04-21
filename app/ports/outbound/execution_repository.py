@@ -21,14 +21,18 @@ class ExecutionRepository(ABC):
         latency_ms: int | None = None,
         error: str | None = None,
         metadata: dict | None = None,
+        selected_edge_id: str | None = None,
+        justification: str | None = None,
+        confidence: float | None = None,
     ) -> UUID:
         raise NotImplementedError
 
     @abstractmethod
-    async def get_session_flow(self, session_id: str) -> list[dict]:
+    async def get_session_flow(self, session_id: str) -> dict | None:
         """
-        Returns executions for a session ordered by time, each annotated with
-        incoming_edge (edge that came from the previous node) and
-        outgoing_edge (edge that leads to the next node).
+        Returns the current flow state for a session:
+        - current_node: node where the session currently is
+        - incoming_edge: the edge that concluded and led to current_node (None if first node)
+        - next_edges: all outgoing edges from current_node
         """
         raise NotImplementedError

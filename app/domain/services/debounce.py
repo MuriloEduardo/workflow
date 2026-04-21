@@ -88,17 +88,18 @@ class DebounceService:
         flow = await self._execution_repo.get_session_flow(session_id)
         if not flow:
             return {}
-        last = flow[-1]
         return {
-            "current_node_id": last["node_id"],
+            "current_node_id": flow["node_id"],
+            "current_node_name": flow["node_name"],
+            "current_node_prompt": flow["node_prompt"],
             "incoming_edge": (
                 {
-                    "id": last["incoming_edge_id"],
-                    "label": last["incoming_edge_label"],
-                    "condition_prompt": last["incoming_edge_condition"],
+                    "id": flow["incoming_edge_id"],
+                    "label": flow["incoming_edge_label"],
+                    "condition_prompt": flow["incoming_edge_condition"],
                 }
-                if last.get("incoming_edge_id")
+                if flow.get("incoming_edge_id")
                 else None
             ),
-            "next_edges": last.get("next_edges") or [],
+            "next_edges": flow.get("next_edges") or [],
         }

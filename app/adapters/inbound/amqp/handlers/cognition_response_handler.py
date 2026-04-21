@@ -57,6 +57,9 @@ class CognitionResponseHandler(MessageHandler):
             total_tokens=cognition_resp.tokens_used,
             latency_ms=latency_ms,
             error=cognition_resp.error,
+            selected_edge_id=cognition_resp.selected_edge_id,
+            justification=cognition_resp.justification,
+            confidence=cognition_resp.confidence,
         )
 
         logger.info(
