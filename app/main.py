@@ -11,6 +11,7 @@ from app.adapters.inbound.http.edges_router import router as edges_router
 from app.adapters.inbound.http.executions_router import router as executions_router
 from app.adapters.inbound.http.nodes_router import router as nodes_router
 from app.adapters.inbound.http.properties_router import router as properties_router
+from app.adapters.inbound.http.tenants_router import router as tenants_router
 from app.adapters.inbound.http.workflows_router import router as workflows_router
 from app.container import Container
 from app.workers import available_workers
@@ -61,6 +62,7 @@ def create_app(container: Container) -> FastAPI:
     app.include_router(conditions_router)
     app.include_router(properties_router)
     app.include_router(executions_router)
+    app.include_router(tenants_router)
     app.include_router(workflows_router)
 
     return app
