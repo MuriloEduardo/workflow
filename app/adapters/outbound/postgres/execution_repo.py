@@ -93,14 +93,24 @@ class PostgresExecutionRepository(ExecutionRepository):
                 n.prompt       AS node_prompt,
                 e_in.id        AS incoming_edge_id,
                 e_in.label     AS incoming_edge_label,
-                e_in.condition_prompt AS incoming_edge_condition,
+                (
+                    SELECT string_agg(c.prompt, E'\n' ORDER BY c.created_at)
+                    FROM conditions c
+                    JOIN edge_conditions ec ON ec.condition_id = c.id
+                    WHERE ec.edge_id = e_in.id AND c.prompt IS NOT NULL
+                ) AS incoming_edge_condition,
                 (
                     SELECT json_agg(
                         json_build_object(
                             'id',               e.id,
                             'target_node_id',   e.target_node_id,
                             'label',            e.label,
-                            'condition_prompt',  e.condition_prompt,
+                            'condition_prompt', (
+                                SELECT string_agg(c.prompt, E'\n' ORDER BY c.created_at)
+                                FROM conditions c
+                                JOIN edge_conditions ec ON ec.condition_id = c.id
+                                WHERE ec.edge_id = e.id AND c.prompt IS NOT NULL
+                            ),
                             'priority',         e.priority
                         ) ORDER BY e.priority, e.created_at
                     )
