@@ -2,7 +2,7 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/conditions", tags=["conditions"])
 
@@ -26,6 +26,12 @@ class ConditionUpdate(BaseModel):
     prompt: str | None = None
     logic_operator: str | None = None
     metadata: dict[str, Any] | None = None
+    edge_ids: list[UUID] | None = Field(
+        default=None, description="Substitui completamente as edges vinculadas"
+    )
+    property_ids: list[UUID] | None = Field(
+        default=None, description="Substitui completamente as properties vinculadas"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -80,9 +86,25 @@ async def update_condition(
     condition_id: UUID, body: ConditionUpdate, repo=Depends(_repo)
 ):
     fields = body.model_dump(exclude_none=True)
-    condition = await repo.update(condition_id, fields)
+    edge_ids = fields.pop("edge_ids", None)
+    property_ids = fields.pop("property_ids", None)
+
+    if fields:
+        condition = await repo.update(condition_id, fields)
+    else:
+        condition = await repo.get(condition_id)
+
     if condition is None:
         raise HTTPException(status_code=404, detail="Condition not found")
+
+    if edge_ids is not None:
+        await repo.sync_edges(condition_id, edge_ids)
+    if property_ids is not None:
+        await repo.sync_properties(condition_id, property_ids)
+
+    if edge_ids is not None or property_ids is not None:
+        condition = await repo.get(condition_id)
+
     return condition
 
 

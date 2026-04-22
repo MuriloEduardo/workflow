@@ -51,6 +51,10 @@ class ConditionRepository(ABC):
     async def unlink_edge(self, condition_id: UUID, edge_id: UUID) -> bool:
         raise NotImplementedError
 
+    @abstractmethod
+    async def sync_edges(self, condition_id: UUID, edge_ids: list[UUID]) -> None:
+        raise NotImplementedError
+
     # ------------------------------------------------------------------
     # Condition ↔ Property junction
     # ------------------------------------------------------------------
@@ -61,6 +65,12 @@ class ConditionRepository(ABC):
 
     @abstractmethod
     async def unlink_property(self, condition_id: UUID, property_id: UUID) -> bool:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def sync_properties(
+        self, condition_id: UUID, property_ids: list[UUID]
+    ) -> None:
         raise NotImplementedError
 
     @abstractmethod

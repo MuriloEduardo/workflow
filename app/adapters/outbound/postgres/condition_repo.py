@@ -13,6 +13,13 @@ _EDGE_IDS = (
     ") AS edge_ids"
 )
 
+_PROPERTY_IDS = (
+    "ARRAY("
+    "SELECT cp.property_id::text FROM condition_properties cp "
+    "WHERE cp.condition_id = c.id ORDER BY cp.property_id"
+    ") AS property_ids"
+)
+
 
 def _row_to_dict(row: object) -> dict:
     d = dict(row)
@@ -23,6 +30,7 @@ def _row_to_dict(row: object) -> dict:
         if isinstance(d.get(field), str):
             d[field] = json.loads(d[field])
     d["edge_ids"] = list(d.get("edge_ids") or [])
+    d["property_ids"] = list(d.get("property_ids") or [])
     return d
 
 
@@ -57,7 +65,7 @@ class PostgresConditionRepository(ConditionRepository):
         pool = await self._database.get_pool()
         row = await pool.fetchrow(
             f"""
-            SELECT c.{_COLS.replace(", ", ", c.")}, {_EDGE_IDS}
+            SELECT c.{_COLS.replace(", ", ", c.")}, {_EDGE_IDS}, {_PROPERTY_IDS}
             FROM conditions c
             WHERE c.id = $1
             """,
@@ -69,7 +77,7 @@ class PostgresConditionRepository(ConditionRepository):
         pool = await self._database.get_pool()
         rows = await pool.fetch(
             f"""
-            SELECT c.{_COLS.replace(", ", ", c.")}, {_EDGE_IDS}
+            SELECT c.{_COLS.replace(", ", ", c.")}, {_EDGE_IDS}, {_PROPERTY_IDS}
             FROM conditions c
             ORDER BY c.created_at
             """
@@ -80,7 +88,7 @@ class PostgresConditionRepository(ConditionRepository):
         pool = await self._database.get_pool()
         rows = await pool.fetch(
             f"""
-            SELECT c.{_COLS.replace(", ", ", c.")}, {_EDGE_IDS}
+            SELECT c.{_COLS.replace(", ", ", c.")}, {_EDGE_IDS}, {_PROPERTY_IDS}
             FROM conditions c
             JOIN edge_conditions ec ON ec.condition_id = c.id
             WHERE ec.edge_id = $1
@@ -94,7 +102,7 @@ class PostgresConditionRepository(ConditionRepository):
         pool = await self._database.get_pool()
         rows = await pool.fetch(
             f"""
-            SELECT c.{_COLS.replace(", ", ", c.")}, {_EDGE_IDS}
+            SELECT c.{_COLS.replace(", ", ", c.")}, {_EDGE_IDS}, {_PROPERTY_IDS}
             FROM conditions c
             WHERE EXISTS (
                 SELECT 1 FROM edge_conditions ec
@@ -172,6 +180,26 @@ class PostgresConditionRepository(ConditionRepository):
         )
         return result.split()[-1] != "0"
 
+    async def sync_edges(self, condition_id: UUID, edge_ids: list[UUID]) -> None:
+        """Replace all edge links for a condition with the given list."""
+        pool = await self._database.get_pool()
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                await conn.execute(
+                    "DELETE FROM edge_conditions WHERE condition_id = $1",
+                    condition_id,
+                )
+                for edge_id in edge_ids:
+                    await conn.execute(
+                        """
+                        INSERT INTO edge_conditions (edge_id, condition_id)
+                        VALUES ($1, $2)
+                        ON CONFLICT DO NOTHING
+                        """,
+                        edge_id,
+                        condition_id,
+                    )
+
     # ------------------------------------------------------------------
     # Condition ↔ Property junction
     # ------------------------------------------------------------------
@@ -196,6 +224,28 @@ class PostgresConditionRepository(ConditionRepository):
             property_id,
         )
         return result.split()[-1] != "0"
+
+    async def sync_properties(
+        self, condition_id: UUID, property_ids: list[UUID]
+    ) -> None:
+        """Replace all property links for a condition with the given list."""
+        pool = await self._database.get_pool()
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                await conn.execute(
+                    "DELETE FROM condition_properties WHERE condition_id = $1",
+                    condition_id,
+                )
+                for property_id in property_ids:
+                    await conn.execute(
+                        """
+                        INSERT INTO condition_properties (condition_id, property_id)
+                        VALUES ($1, $2)
+                        ON CONFLICT DO NOTHING
+                        """,
+                        condition_id,
+                        property_id,
+                    )
 
     async def list_properties(self, condition_id: UUID) -> list[dict]:
         pool = await self._database.get_pool()
