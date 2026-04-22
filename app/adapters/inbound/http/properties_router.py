@@ -13,7 +13,6 @@ router = APIRouter(prefix="/properties", tags=["properties"])
 
 
 class PropertyCreate(BaseModel):
-    workflow_id: UUID | None = None
     name: str
     type: str
     description: str | None = None
@@ -50,7 +49,6 @@ def _repo(request: Request):
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_property(body: PropertyCreate, repo=Depends(_repo)):
     prop_id = await repo.create(
-        workflow_id=body.workflow_id,
         name=body.name,
         type=body.type,
         description=body.description,

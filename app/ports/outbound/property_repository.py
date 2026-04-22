@@ -6,7 +6,6 @@ class PropertyRepository(ABC):
     @abstractmethod
     async def create(
         self,
-        workflow_id: UUID | None,
         name: str,
         type: str,
         description: str | None,

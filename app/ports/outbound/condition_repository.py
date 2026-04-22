@@ -6,7 +6,6 @@ class ConditionRepository(ABC):
     @abstractmethod
     async def create(
         self,
-        workflow_id: UUID | None,
         operator: str,
         compare_value: object | None,
         prompt: str | None,
