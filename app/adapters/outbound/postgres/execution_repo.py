@@ -91,6 +91,25 @@ class PostgresExecutionRepository(ExecutionRepository):
                 n.id           AS node_id,
                 n.name         AS node_name,
                 n.prompt       AS node_prompt,
+                n.workflow_id  AS workflow_id,
+                (
+                    SELECT w.metadata->>'system_prompt'
+                    FROM workflows w
+                    WHERE w.id = n.workflow_id
+                ) AS system_prompt,
+                (
+                    SELECT json_agg(
+                        json_build_object(
+                            'name',        p.name,
+                            'type',        p.type,
+                            'description', p.description,
+                            'required',    p.required
+                        ) ORDER BY p.name
+                    )
+                    FROM properties p
+                    JOIN node_properties np ON np.property_id = p.id
+                    WHERE np.node_id = n.id
+                ) AS node_properties,
                 e_in.id        AS incoming_edge_id,
                 e_in.label     AS incoming_edge_label,
                 (
@@ -127,8 +146,20 @@ class PostgresExecutionRepository(ExecutionRepository):
             return None
         d = dict(row)
         d["node_id"] = str(d["node_id"])
+        if d.get("workflow_id"):
+            d["workflow_id"] = str(d["workflow_id"])
         if d["incoming_edge_id"]:
             d["incoming_edge_id"] = str(d["incoming_edge_id"])
+        # node_properties: list of dicts or None
+        if isinstance(d.get("node_properties"), str):
+            import json as _json
+
+            try:
+                d["node_properties"] = _json.loads(d["node_properties"])
+            except (_json.JSONDecodeError, TypeError):
+                d["node_properties"] = []
+        if not d.get("node_properties"):
+            d["node_properties"] = []
         if isinstance(d.get("next_edges"), str):
             import json as _json
 

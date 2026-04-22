@@ -89,9 +89,11 @@ class DebounceService:
         if not flow:
             return {}
         return {
+            "system_prompt": flow.get("system_prompt") or "",
             "current_node_id": flow["node_id"],
             "current_node_name": flow["node_name"],
             "current_node_prompt": flow["node_prompt"],
+            "properties": flow.get("node_properties") or [],
             "incoming_edge": (
                 {
                     "id": flow["incoming_edge_id"],
