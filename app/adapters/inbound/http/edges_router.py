@@ -22,6 +22,9 @@ class EdgeCreate(BaseModel):
 
 
 class EdgeUpdate(BaseModel):
+    workflow_id: UUID | None = None
+    source_node_id: UUID | None = None
+    target_node_id: UUID | None = None
     label: str | None = None
     priority: int | None = None
     metadata: dict[str, Any] | None = None

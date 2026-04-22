@@ -72,7 +72,14 @@ class PostgresEdgeRepository(EdgeRepository):
     async def update(self, edge_id: UUID, fields: dict) -> dict | None:
         if not fields:
             return await self.get(edge_id)
-        allowed = {"label", "priority", "metadata"}
+        allowed = {
+            "workflow_id",
+            "source_node_id",
+            "target_node_id",
+            "label",
+            "priority",
+            "metadata",
+        }
         json_cols = {"metadata"}
         sets, params = [], [edge_id]
         for key, val in fields.items():

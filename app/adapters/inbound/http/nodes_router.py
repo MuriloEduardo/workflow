@@ -26,6 +26,7 @@ class NodeCreate(BaseModel):
 
 
 class NodeUpdate(BaseModel):
+    workflow_id: UUID | None = None
     name: str | None = None
     description: str | None = None
     status: str | None = None

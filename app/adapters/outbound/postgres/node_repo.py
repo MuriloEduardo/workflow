@@ -73,6 +73,7 @@ class PostgresNodeRepository(NodeRepository):
         if not fields:
             return await self.get(node_id)
         allowed = {
+            "workflow_id",
             "name",
             "description",
             "status",
