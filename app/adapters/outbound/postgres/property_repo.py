@@ -93,3 +93,42 @@ class PostgresPropertyRepository(PropertyRepository):
         pool = await self._database.get_pool()
         result = await pool.execute("DELETE FROM properties WHERE id = $1", property_id)
         return result.split()[-1] != "0"
+
+    # ------------------------------------------------------------------
+    # Node ↔ Property junction
+    # ------------------------------------------------------------------
+
+    async def link_to_node(self, property_id: UUID, node_id: UUID) -> None:
+        pool = await self._database.get_pool()
+        await pool.execute(
+            """
+            INSERT INTO node_properties (node_id, property_id)
+            VALUES ($1, $2)
+            ON CONFLICT DO NOTHING
+            """,
+            node_id,
+            property_id,
+        )
+
+    async def unlink_from_node(self, property_id: UUID, node_id: UUID) -> bool:
+        pool = await self._database.get_pool()
+        result = await pool.execute(
+            "DELETE FROM node_properties WHERE node_id = $1 AND property_id = $2",
+            node_id,
+            property_id,
+        )
+        return result.split()[-1] != "0"
+
+    async def list_by_node(self, node_id: UUID) -> list[dict]:
+        pool = await self._database.get_pool()
+        rows = await pool.fetch(
+            f"""
+            SELECT p.{_COLS.replace(", ", ", p.")}
+            FROM properties p
+            JOIN node_properties np ON np.property_id = p.id
+            WHERE np.node_id = $1
+            ORDER BY p.name
+            """,
+            node_id,
+        )
+        return [_row_to_dict(r) for r in rows]

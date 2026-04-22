@@ -18,7 +18,6 @@ class NodeCreate(BaseModel):
     status: str = "active"
     prompt: str | None = None
     response_format: dict[str, Any] | None = None
-    properties: dict[str, Any] = {}
     config: dict[str, Any] = {}
     metadata: dict[str, Any] = {}
     order: int | None = None
@@ -31,7 +30,6 @@ class NodeUpdate(BaseModel):
     status: str | None = None
     prompt: str | None = None
     response_format: dict[str, Any] | None = None
-    properties: dict[str, Any] | None = None
     config: dict[str, Any] | None = None
     metadata: dict[str, Any] | None = None
     order: int | None = None
@@ -39,12 +37,16 @@ class NodeUpdate(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Dependency helper
+# Dependency helpers
 # ---------------------------------------------------------------------------
 
 
 def _repo(request: Request):
     return request.app.state.container.node_repo
+
+
+def _property_repo(request: Request):
+    return request.app.state.container.property_repo
 
 
 # ---------------------------------------------------------------------------
@@ -60,7 +62,6 @@ async def create_node(body: NodeCreate, repo=Depends(_repo)):
         status=body.status,
         prompt=body.prompt,
         response_format=body.response_format,
-        properties=body.properties,
         config=body.config,
         metadata=body.metadata,
         order=body.order,
@@ -97,3 +98,48 @@ async def delete_node(node_id: UUID, repo=Depends(_repo)):
     deleted = await repo.delete(node_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Node not found")
+
+
+# ---------------------------------------------------------------------------
+# Node ↔ Property sub-resource
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{node_id}/properties")
+async def list_node_properties(
+    node_id: UUID, prop_repo=Depends(_property_repo), repo=Depends(_repo)
+):
+    node = await repo.get(node_id)
+    if node is None:
+        raise HTTPException(status_code=404, detail="Node not found")
+    return await prop_repo.list_by_node(node_id)
+
+
+@router.post(
+    "/{node_id}/properties/{property_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def link_node_property(
+    node_id: UUID,
+    property_id: UUID,
+    prop_repo=Depends(_property_repo),
+    repo=Depends(_repo),
+):
+    node = await repo.get(node_id)
+    if node is None:
+        raise HTTPException(status_code=404, detail="Node not found")
+    await prop_repo.link_to_node(property_id, node_id)
+
+
+@router.delete(
+    "/{node_id}/properties/{property_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def unlink_node_property(
+    node_id: UUID,
+    property_id: UUID,
+    prop_repo=Depends(_property_repo),
+):
+    removed = await prop_repo.unlink_from_node(property_id, node_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail="Association not found")

@@ -87,3 +87,52 @@ async def delete_edge(edge_id: UUID, repo=Depends(_repo)):
     deleted = await repo.delete(edge_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Edge not found")
+
+
+# ---------------------------------------------------------------------------
+# Edge ↔ Condition sub-resource
+# ---------------------------------------------------------------------------
+
+
+def _condition_repo(request: Request):
+    return request.app.state.container.condition_repo
+
+
+@router.get("/{edge_id}/conditions")
+async def list_edge_conditions(
+    edge_id: UUID, repo=Depends(_repo), condition_repo=Depends(_condition_repo)
+):
+    edge = await repo.get(edge_id)
+    if edge is None:
+        raise HTTPException(status_code=404, detail="Edge not found")
+    return await condition_repo.list_by_edge(edge_id)
+
+
+@router.post(
+    "/{edge_id}/conditions/{condition_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def link_edge_condition(
+    edge_id: UUID,
+    condition_id: UUID,
+    repo=Depends(_repo),
+    condition_repo=Depends(_condition_repo),
+):
+    edge = await repo.get(edge_id)
+    if edge is None:
+        raise HTTPException(status_code=404, detail="Edge not found")
+    await condition_repo.link_edge(condition_id, edge_id)
+
+
+@router.delete(
+    "/{edge_id}/conditions/{condition_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def unlink_edge_condition(
+    edge_id: UUID,
+    condition_id: UUID,
+    condition_repo=Depends(_condition_repo),
+):
+    removed = await condition_repo.unlink_edge(condition_id, edge_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail="Association not found")

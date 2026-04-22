@@ -13,9 +13,7 @@ router = APIRouter(prefix="/conditions", tags=["conditions"])
 
 
 class ConditionCreate(BaseModel):
-    edge_id: UUID
     operator: str
-    property_name: str | None = None
     compare_value: Any | None = None
     prompt: str | None = None
     logic_operator: str = "AND"
@@ -24,7 +22,6 @@ class ConditionCreate(BaseModel):
 
 class ConditionUpdate(BaseModel):
     operator: str | None = None
-    property_name: str | None = None
     compare_value: Any | None = None
     prompt: str | None = None
     logic_operator: str | None = None
@@ -48,9 +45,7 @@ def _repo(request: Request):
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_condition(body: ConditionCreate, repo=Depends(_repo)):
     condition_id = await repo.create(
-        edge_id=body.edge_id,
         operator=body.operator,
-        property_name=body.property_name,
         compare_value=body.compare_value,
         prompt=body.prompt,
         logic_operator=body.logic_operator,
@@ -60,8 +55,10 @@ async def create_condition(body: ConditionCreate, repo=Depends(_repo)):
 
 
 @router.get("")
-async def list_conditions(edge_id: UUID, repo=Depends(_repo)):
-    return await repo.list_by_edge(edge_id)
+async def list_conditions(edge_id: UUID | None = None, repo=Depends(_repo)):
+    if edge_id is not None:
+        return await repo.list_by_edge(edge_id)
+    return await repo.list_all()
 
 
 @router.get("/{condition_id}")
@@ -88,3 +85,41 @@ async def delete_condition(condition_id: UUID, repo=Depends(_repo)):
     deleted = await repo.delete(condition_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Condition not found")
+
+
+# ---------------------------------------------------------------------------
+# Condition ↔ Property sub-resource
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{condition_id}/properties")
+async def list_condition_properties(condition_id: UUID, repo=Depends(_repo)):
+    condition = await repo.get(condition_id)
+    if condition is None:
+        raise HTTPException(status_code=404, detail="Condition not found")
+    return await repo.list_properties(condition_id)
+
+
+@router.post(
+    "/{condition_id}/properties/{property_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def link_condition_property(
+    condition_id: UUID, property_id: UUID, repo=Depends(_repo)
+):
+    condition = await repo.get(condition_id)
+    if condition is None:
+        raise HTTPException(status_code=404, detail="Condition not found")
+    await repo.link_property(condition_id, property_id)
+
+
+@router.delete(
+    "/{condition_id}/properties/{property_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def unlink_condition_property(
+    condition_id: UUID, property_id: UUID, repo=Depends(_repo)
+):
+    removed = await repo.unlink_property(condition_id, property_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail="Association not found")

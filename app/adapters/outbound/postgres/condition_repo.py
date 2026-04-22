@@ -4,13 +4,12 @@ from uuid import UUID
 from app.infrastructure.database.postgres_connection import PostgresConnection
 from app.ports.outbound.condition_repository import ConditionRepository
 
-_COLS = "id, edge_id, operator, property_name, compare_value, prompt, logic_operator, metadata, created_at, updated_at"
+_COLS = "id, operator, compare_value, prompt, logic_operator, metadata, created_at, updated_at"
 
 
 def _row_to_dict(row: object) -> dict:
     d = dict(row)
     d["id"] = str(d["id"])
-    d["edge_id"] = str(d["edge_id"])
     d["created_at"] = d["created_at"].isoformat()
     d["updated_at"] = d["updated_at"].isoformat()
     return d
@@ -22,9 +21,7 @@ class PostgresConditionRepository(ConditionRepository):
 
     async def create(
         self,
-        edge_id: UUID,
         operator: str,
-        property_name: str | None,
         compare_value: object | None,
         prompt: str | None,
         logic_operator: str,
@@ -34,13 +31,11 @@ class PostgresConditionRepository(ConditionRepository):
         return await pool.fetchval(
             """
             INSERT INTO conditions
-                (edge_id, operator, property_name, compare_value, prompt, logic_operator, metadata)
-            VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7::jsonb)
+                (operator, compare_value, prompt, logic_operator, metadata)
+            VALUES ($1,$2::jsonb,$3,$4,$5::jsonb)
             RETURNING id
             """,
-            edge_id,
             operator,
-            property_name,
             json.dumps(compare_value) if compare_value is not None else None,
             prompt,
             logic_operator,
@@ -54,10 +49,21 @@ class PostgresConditionRepository(ConditionRepository):
         )
         return _row_to_dict(row) if row else None
 
+    async def list_all(self) -> list[dict]:
+        pool = await self._database.get_pool()
+        rows = await pool.fetch(f"SELECT {_COLS} FROM conditions ORDER BY created_at")
+        return [_row_to_dict(r) for r in rows]
+
     async def list_by_edge(self, edge_id: UUID) -> list[dict]:
         pool = await self._database.get_pool()
         rows = await pool.fetch(
-            f"SELECT {_COLS} FROM conditions WHERE edge_id = $1 ORDER BY created_at",
+            f"""
+            SELECT c.{_COLS.replace(", ", ", c.")}
+            FROM conditions c
+            JOIN edge_conditions ec ON ec.condition_id = c.id
+            WHERE ec.edge_id = $1
+            ORDER BY c.created_at
+            """,
             edge_id,
         )
         return [_row_to_dict(r) for r in rows]
@@ -67,7 +73,6 @@ class PostgresConditionRepository(ConditionRepository):
             return await self.get(condition_id)
         allowed = {
             "operator",
-            "property_name",
             "compare_value",
             "prompt",
             "logic_operator",
@@ -99,3 +104,75 @@ class PostgresConditionRepository(ConditionRepository):
             "DELETE FROM conditions WHERE id = $1", condition_id
         )
         return result.split()[-1] != "0"
+
+    # ------------------------------------------------------------------
+    # Edge ↔ Condition junction
+    # ------------------------------------------------------------------
+
+    async def link_edge(self, condition_id: UUID, edge_id: UUID) -> None:
+        pool = await self._database.get_pool()
+        await pool.execute(
+            """
+            INSERT INTO edge_conditions (edge_id, condition_id)
+            VALUES ($1, $2)
+            ON CONFLICT DO NOTHING
+            """,
+            edge_id,
+            condition_id,
+        )
+
+    async def unlink_edge(self, condition_id: UUID, edge_id: UUID) -> bool:
+        pool = await self._database.get_pool()
+        result = await pool.execute(
+            "DELETE FROM edge_conditions WHERE edge_id = $1 AND condition_id = $2",
+            edge_id,
+            condition_id,
+        )
+        return result.split()[-1] != "0"
+
+    # ------------------------------------------------------------------
+    # Condition ↔ Property junction
+    # ------------------------------------------------------------------
+
+    async def link_property(self, condition_id: UUID, property_id: UUID) -> None:
+        pool = await self._database.get_pool()
+        await pool.execute(
+            """
+            INSERT INTO condition_properties (condition_id, property_id)
+            VALUES ($1, $2)
+            ON CONFLICT DO NOTHING
+            """,
+            condition_id,
+            property_id,
+        )
+
+    async def unlink_property(self, condition_id: UUID, property_id: UUID) -> bool:
+        pool = await self._database.get_pool()
+        result = await pool.execute(
+            "DELETE FROM condition_properties WHERE condition_id = $1 AND property_id = $2",
+            condition_id,
+            property_id,
+        )
+        return result.split()[-1] != "0"
+
+    async def list_properties(self, condition_id: UUID) -> list[dict]:
+        pool = await self._database.get_pool()
+        rows = await pool.fetch(
+            """
+            SELECT p.id, p.name, p.type, p.description, p.required,
+                   p.default_value, p.schema, p.metadata, p.created_at, p.updated_at
+            FROM properties p
+            JOIN condition_properties cp ON cp.property_id = p.id
+            WHERE cp.condition_id = $1
+            ORDER BY p.name
+            """,
+            condition_id,
+        )
+        result = []
+        for r in rows:
+            d = dict(r)
+            d["id"] = str(d["id"])
+            d["created_at"] = d["created_at"].isoformat()
+            d["updated_at"] = d["updated_at"].isoformat()
+            result.append(d)
+        return result

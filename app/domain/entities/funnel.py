@@ -6,14 +6,17 @@ Edges are directed transitions between nodes (source → target).
 Executions record cognition call results produced during a node activation.
 
 Cardinality:
-  - Tenant  1 ── N  TenantContact
-  - Node    1 ── N  Edge  (as source)
-  - Node    1 ── N  Edge  (as target)
-  - Edge    N ── 1  Node  (source_node_id)
-  - Edge    N ── 1  Node  (target_node_id)
-  - Node    1 ── N  Execution
-  - Tenant  1 ── N  Execution
+  - Tenant        1 ── N  TenantContact
+  - Node          1 ── N  Edge  (as source)
+  - Node          1 ── N  Edge  (as target)
+  - Edge          N ── 1  Node  (source_node_id)
+  - Edge          N ── 1  Node  (target_node_id)
+  - Node          1 ── N  Execution
+  - Tenant        1 ── N  Execution
   - TenantContact 1 ── N  Execution
+  - Edge          N ── N  Condition  (via EdgeCondition)
+  - Node          N ── N  Property   (via NodeProperty)
+  - Condition     N ── N  Property   (via ConditionProperty)
 """
 
 from __future__ import annotations
@@ -79,9 +82,6 @@ class Node(BaseModel):
 
     # Configuration for LLM response format
     response_format: dict[str, Any] | None = None  # tool calling schema
-
-    # Properties/schema fields for extraction nodes
-    properties: dict[str, Any] = Field(default_factory=dict)
 
     # Additional node configuration
     config: dict[str, Any] = Field(default_factory=dict)
@@ -176,11 +176,9 @@ class Condition(BaseModel):
     """
 
     id: str
-    edge_id: str
 
     # Condition logic
     operator: str  # eq, neq, contains, gt, lt, exists, is_null, etc.
-    property_name: str | None = None  # which property to evaluate
     compare_value: Any | None = None  # value to compare against
 
     # Natural language condition (for LLM evaluation)
@@ -192,6 +190,42 @@ class Condition(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
     created_at: str
     updated_at: str
+
+
+# ---------------------------------------------------------------------------
+# Junction: Edge ↔ Condition
+# ---------------------------------------------------------------------------
+
+
+class EdgeCondition(BaseModel):
+    """Association between an edge and a condition (N:N)."""
+
+    edge_id: str
+    condition_id: str
+
+
+# ---------------------------------------------------------------------------
+# Junction: Node ↔ Property
+# ---------------------------------------------------------------------------
+
+
+class NodeProperty(BaseModel):
+    """Association between a node and a property (N:N)."""
+
+    node_id: str
+    property_id: str
+
+
+# ---------------------------------------------------------------------------
+# Junction: Condition ↔ Property
+# ---------------------------------------------------------------------------
+
+
+class ConditionProperty(BaseModel):
+    """Association between a condition and a property (N:N)."""
+
+    condition_id: str
+    property_id: str
 
 
 # ---------------------------------------------------------------------------

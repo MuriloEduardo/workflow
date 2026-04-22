@@ -11,7 +11,6 @@ class NodeRepository(ABC):
         status: str,
         prompt: str | None,
         response_format: dict | None,
-        properties: dict,
         config: dict,
         metadata: dict,
         order: int | None,

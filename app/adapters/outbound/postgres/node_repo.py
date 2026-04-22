@@ -4,7 +4,7 @@ from uuid import UUID
 from app.infrastructure.database.postgres_connection import PostgresConnection
 from app.ports.outbound.node_repository import NodeRepository
 
-_COLS = 'id, name, description, status, prompt, response_format, properties, config, metadata, "order", priority, created_at, updated_at'
+_COLS = 'id, name, description, status, prompt, response_format, config, metadata, "order", priority, created_at, updated_at'
 
 
 def _row_to_dict(row: object) -> dict:
@@ -26,7 +26,6 @@ class PostgresNodeRepository(NodeRepository):
         status: str,
         prompt: str | None,
         response_format: dict | None,
-        properties: dict,
         config: dict,
         metadata: dict,
         order: int | None,
@@ -36,9 +35,9 @@ class PostgresNodeRepository(NodeRepository):
         return await pool.fetchval(
             """
             INSERT INTO nodes
-                (name, description, status, prompt, response_format, properties,
+                (name, description, status, prompt, response_format,
                  config, metadata, "order", priority)
-            VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7::jsonb,$8::jsonb,$9,$10)
+            VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7::jsonb,$8,$9)
             RETURNING id
             """,
             name,
@@ -46,7 +45,6 @@ class PostgresNodeRepository(NodeRepository):
             status,
             prompt,
             json.dumps(response_format) if response_format is not None else None,
-            json.dumps(properties),
             json.dumps(config),
             json.dumps(metadata),
             order,
@@ -74,13 +72,12 @@ class PostgresNodeRepository(NodeRepository):
             "status",
             "prompt",
             "response_format",
-            "properties",
             "config",
             "metadata",
             "order",
             "priority",
         }
-        json_cols = {"response_format", "properties", "config", "metadata"}
+        json_cols = {"response_format", "config", "metadata"}
         sets, params = [], [node_id]
         for key, val in fields.items():
             if key not in allowed:
