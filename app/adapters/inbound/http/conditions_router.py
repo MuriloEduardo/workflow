@@ -13,6 +13,7 @@ router = APIRouter(prefix="/conditions", tags=["conditions"])
 
 
 class ConditionCreate(BaseModel):
+    edge_id: UUID
     operator: str
     compare_value: Any | None = None
     prompt: str | None = None
@@ -43,13 +44,24 @@ def _repo(request: Request):
     return request.app.state.container.condition_repo
 
 
+def _edge_repo(request: Request):
+    return request.app.state.container.edge_repo
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-async def create_condition(body: ConditionCreate, repo=Depends(_repo)):
+async def create_condition(
+    body: ConditionCreate,
+    repo=Depends(_repo),
+    edge_repo=Depends(_edge_repo),
+):
+    edge = await edge_repo.get(body.edge_id)
+    if edge is None:
+        raise HTTPException(status_code=404, detail="Edge not found")
     condition_id = await repo.create(
         operator=body.operator,
         compare_value=body.compare_value,
@@ -57,6 +69,7 @@ async def create_condition(body: ConditionCreate, repo=Depends(_repo)):
         logic_operator=body.logic_operator,
         metadata=body.metadata,
     )
+    await repo.link_edge(UUID(str(condition_id)), body.edge_id)
     return await repo.get(UUID(str(condition_id)))
 
 

@@ -13,6 +13,7 @@ router = APIRouter(prefix="/properties", tags=["properties"])
 
 
 class PropertyCreate(BaseModel):
+    node_id: UUID
     name: str
     type: str
     description: str | None = None
@@ -41,13 +42,24 @@ def _repo(request: Request):
     return request.app.state.container.property_repo
 
 
+def _node_repo(request: Request):
+    return request.app.state.container.node_repo
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-async def create_property(body: PropertyCreate, repo=Depends(_repo)):
+async def create_property(
+    body: PropertyCreate,
+    repo=Depends(_repo),
+    node_repo=Depends(_node_repo),
+):
+    node = await node_repo.get(body.node_id)
+    if node is None:
+        raise HTTPException(status_code=404, detail="Node not found")
     prop_id = await repo.create(
         name=body.name,
         type=body.type,
@@ -57,6 +69,7 @@ async def create_property(body: PropertyCreate, repo=Depends(_repo)):
         schema=body.json_schema,
         metadata=body.metadata,
     )
+    await repo.link_to_node(UUID(str(prop_id)), body.node_id)
     return await repo.get(UUID(str(prop_id)))
 
 
