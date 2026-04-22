@@ -73,12 +73,12 @@ async def create_node(body: NodeCreate, repo=Depends(_repo)):
 
 @router.get("")
 async def list_nodes(repo=Depends(_repo)):
-    return await repo.list_all()
+    return await repo.list_all_full()
 
 
 @router.get("/{node_id}")
 async def get_node(node_id: UUID, repo=Depends(_repo)):
-    node = await repo.get(node_id)
+    node = await repo.get_full(node_id)
     if node is None:
         raise HTTPException(status_code=404, detail="Node not found")
     return node

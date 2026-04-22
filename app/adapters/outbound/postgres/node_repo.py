@@ -102,3 +102,70 @@ class PostgresNodeRepository(NodeRepository):
         pool = await self._database.get_pool()
         result = await pool.execute("DELETE FROM nodes WHERE id = $1", node_id)
         return result.split()[-1] != "0"
+
+    # ------------------------------------------------------------------
+    # Full read (with embedded relations)
+    # ------------------------------------------------------------------
+
+    _FULL_PROPS = """
+        COALESCE(
+            jsonb_agg(
+                jsonb_build_object(
+                    'id',            p.id::text,
+                    'name',          p.name,
+                    'type',          p.type,
+                    'description',   p.description,
+                    'required',      p.required,
+                    'default_value', p.default_value,
+                    'schema',        p.schema,
+                    'metadata',      p.metadata
+                ) ORDER BY p.name
+            ) FILTER (WHERE p.id IS NOT NULL),
+            '[]'::jsonb
+        ) AS properties
+    """
+
+    _FULL_JOINS = """
+        LEFT JOIN node_properties np ON np.node_id = n.id
+        LEFT JOIN properties p       ON p.id = np.property_id
+    """
+
+    _FULL_GROUP = (
+        "n.id, n.name, n.description, n.status, n.prompt, "
+        'n.response_format, n.config, n.metadata, n."order", n.priority, '
+        "n.created_at, n.updated_at"
+    )
+
+    def _full_row_to_dict(self, row) -> dict:
+        d = dict(row)
+        d["id"] = str(d["id"])
+        d["created_at"] = d["created_at"].isoformat()
+        d["updated_at"] = d["updated_at"].isoformat()
+        return d
+
+    async def get_full(self, node_id: UUID) -> dict | None:
+        pool = await self._database.get_pool()
+        row = await pool.fetchrow(
+            f"""
+            SELECT {self._FULL_GROUP.replace('n.', 'n.')}, {self._FULL_PROPS}
+            FROM nodes n
+            {self._FULL_JOINS}
+            WHERE n.id = $1
+            GROUP BY {self._FULL_GROUP}
+            """,
+            node_id,
+        )
+        return self._full_row_to_dict(row) if row else None
+
+    async def list_all_full(self) -> list[dict]:
+        pool = await self._database.get_pool()
+        rows = await pool.fetch(
+            f"""
+            SELECT {self._FULL_GROUP.replace('n.', 'n.')}, {self._FULL_PROPS}
+            FROM nodes n
+            {self._FULL_JOINS}
+            GROUP BY {self._FULL_GROUP}
+            ORDER BY n."order" NULLS LAST, n.created_at
+            """
+        )
+        return [self._full_row_to_dict(r) for r in rows]

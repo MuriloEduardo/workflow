@@ -92,3 +92,104 @@ class PostgresEdgeRepository(EdgeRepository):
         pool = await self._database.get_pool()
         result = await pool.execute("DELETE FROM edges WHERE id = $1", edge_id)
         return result.split()[-1] != "0"
+
+    # ------------------------------------------------------------------
+    # Full read (with embedded relations)
+    # ------------------------------------------------------------------
+
+    _FULL_CONDITIONS = """
+        COALESCE(
+            jsonb_agg(
+                jsonb_build_object(
+                    'id',             c.id::text,
+                    'operator',       c.operator,
+                    'compare_value',  c.compare_value,
+                    'prompt',         c.prompt,
+                    'logic_operator', c.logic_operator,
+                    'metadata',       c.metadata,
+                    'properties', (
+                        SELECT COALESCE(
+                            jsonb_agg(
+                                jsonb_build_object(
+                                    'id',            p.id::text,
+                                    'name',          p.name,
+                                    'type',          p.type,
+                                    'description',   p.description,
+                                    'required',      p.required,
+                                    'default_value', p.default_value,
+                                    'schema',        p.schema,
+                                    'metadata',      p.metadata
+                                ) ORDER BY p.name
+                            ),
+                            '[]'::jsonb
+                        )
+                        FROM condition_properties cp
+                        JOIN properties p ON p.id = cp.property_id
+                        WHERE cp.condition_id = c.id
+                    )
+                ) ORDER BY c.created_at
+            ) FILTER (WHERE c.id IS NOT NULL),
+            '[]'::jsonb
+        ) AS conditions
+    """
+
+    _FULL_JOINS = """
+        LEFT JOIN edge_conditions ec ON ec.edge_id = e.id
+        LEFT JOIN conditions c       ON c.id = ec.condition_id
+    """
+
+    _FULL_GROUP = (
+        "e.id, e.source_node_id, e.target_node_id, e.label, "
+        "e.priority, e.metadata, e.created_at, e.updated_at"
+    )
+
+    def _full_row_to_dict(self, row) -> dict:
+        d = dict(row)
+        d["id"] = str(d["id"])
+        d["source_node_id"] = str(d["source_node_id"])
+        d["target_node_id"] = str(d["target_node_id"])
+        d["created_at"] = d["created_at"].isoformat()
+        d["updated_at"] = d["updated_at"].isoformat()
+        return d
+
+    async def get_full(self, edge_id: UUID) -> dict | None:
+        pool = await self._database.get_pool()
+        row = await pool.fetchrow(
+            f"""
+            SELECT {self._FULL_GROUP}, {self._FULL_CONDITIONS}
+            FROM edges e
+            {self._FULL_JOINS}
+            WHERE e.id = $1
+            GROUP BY {self._FULL_GROUP}
+            """,
+            edge_id,
+        )
+        return self._full_row_to_dict(row) if row else None
+
+    async def list_all_full(self) -> list[dict]:
+        pool = await self._database.get_pool()
+        rows = await pool.fetch(
+            f"""
+            SELECT {self._FULL_GROUP}, {self._FULL_CONDITIONS}
+            FROM edges e
+            {self._FULL_JOINS}
+            GROUP BY {self._FULL_GROUP}
+            ORDER BY e.priority, e.created_at
+            """
+        )
+        return [self._full_row_to_dict(r) for r in rows]
+
+    async def list_by_source_full(self, source_node_id: UUID) -> list[dict]:
+        pool = await self._database.get_pool()
+        rows = await pool.fetch(
+            f"""
+            SELECT {self._FULL_GROUP}, {self._FULL_CONDITIONS}
+            FROM edges e
+            {self._FULL_JOINS}
+            WHERE e.source_node_id = $1
+            GROUP BY {self._FULL_GROUP}
+            ORDER BY e.priority, e.created_at
+            """,
+            source_node_id,
+        )
+        return [self._full_row_to_dict(r) for r in rows]

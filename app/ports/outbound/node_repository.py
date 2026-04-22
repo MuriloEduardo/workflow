@@ -33,3 +33,13 @@ class NodeRepository(ABC):
     @abstractmethod
     async def delete(self, node_id: UUID) -> bool:
         raise NotImplementedError
+
+    @abstractmethod
+    async def get_full(self, node_id: UUID) -> dict | None:
+        """Returns node with embedded properties list."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def list_all_full(self) -> list[dict]:
+        """Returns all nodes with embedded properties list."""
+        raise NotImplementedError

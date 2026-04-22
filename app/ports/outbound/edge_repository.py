@@ -33,3 +33,18 @@ class EdgeRepository(ABC):
     @abstractmethod
     async def delete(self, edge_id: UUID) -> bool:
         raise NotImplementedError
+
+    @abstractmethod
+    async def get_full(self, edge_id: UUID) -> dict | None:
+        """Returns edge with embedded conditions (each with embedded properties)."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def list_all_full(self) -> list[dict]:
+        """Returns all edges with embedded conditions and their properties."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def list_by_source_full(self, source_node_id: UUID) -> list[dict]:
+        """Returns edges by source node with embedded conditions and their properties."""
+        raise NotImplementedError

@@ -55,13 +55,13 @@ async def create_edge(body: EdgeCreate, repo=Depends(_repo)):
 @router.get("")
 async def list_edges(source_node_id: UUID | None = None, repo=Depends(_repo)):
     if source_node_id is not None:
-        return await repo.list_by_source(source_node_id)
-    return await repo.list_all()
+        return await repo.list_by_source_full(source_node_id)
+    return await repo.list_all_full()
 
 
 @router.get("/{edge_id}")
 async def get_edge(edge_id: UUID, repo=Depends(_repo)):
-    edge = await repo.get(edge_id)
+    edge = await repo.get_full(edge_id)
     if edge is None:
         raise HTTPException(status_code=404, detail="Edge not found")
     return edge
