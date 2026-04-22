@@ -6,6 +6,13 @@ from app.ports.outbound.condition_repository import ConditionRepository
 
 _COLS = "id, operator, compare_value, prompt, logic_operator, metadata, created_at, updated_at"
 
+_EDGE_IDS = (
+    "ARRAY("
+    "SELECT ec.edge_id::text FROM edge_conditions ec "
+    "WHERE ec.condition_id = c.id ORDER BY ec.edge_id"
+    ") AS edge_ids"
+)
+
 
 def _row_to_dict(row: object) -> dict:
     d = dict(row)
@@ -15,6 +22,7 @@ def _row_to_dict(row: object) -> dict:
     for field in ("compare_value", "metadata"):
         if isinstance(d.get(field), str):
             d[field] = json.loads(d[field])
+    d["edge_ids"] = list(d.get("edge_ids") or [])
     return d
 
 
@@ -48,20 +56,31 @@ class PostgresConditionRepository(ConditionRepository):
     async def get(self, condition_id: UUID) -> dict | None:
         pool = await self._database.get_pool()
         row = await pool.fetchrow(
-            f"SELECT {_COLS} FROM conditions WHERE id = $1", condition_id
+            f"""
+            SELECT c.{_COLS.replace(", ", ", c.")}, {_EDGE_IDS}
+            FROM conditions c
+            WHERE c.id = $1
+            """,
+            condition_id,
         )
         return _row_to_dict(row) if row else None
 
     async def list_all(self) -> list[dict]:
         pool = await self._database.get_pool()
-        rows = await pool.fetch(f"SELECT {_COLS} FROM conditions ORDER BY created_at")
+        rows = await pool.fetch(
+            f"""
+            SELECT c.{_COLS.replace(", ", ", c.")}, {_EDGE_IDS}
+            FROM conditions c
+            ORDER BY c.created_at
+            """
+        )
         return [_row_to_dict(r) for r in rows]
 
     async def list_by_edge(self, edge_id: UUID) -> list[dict]:
         pool = await self._database.get_pool()
         rows = await pool.fetch(
             f"""
-            SELECT c.{_COLS.replace(", ", ", c.")}
+            SELECT c.{_COLS.replace(", ", ", c.")}, {_EDGE_IDS}
             FROM conditions c
             JOIN edge_conditions ec ON ec.condition_id = c.id
             WHERE ec.edge_id = $1
@@ -75,12 +94,14 @@ class PostgresConditionRepository(ConditionRepository):
         pool = await self._database.get_pool()
         rows = await pool.fetch(
             f"""
-            SELECT DISTINCT c.{_COLS.replace(", ", ", c.")}
+            SELECT c.{_COLS.replace(", ", ", c.")}, {_EDGE_IDS}
             FROM conditions c
-            JOIN edge_conditions ec ON ec.condition_id = c.id
-            JOIN edges e            ON e.id = ec.edge_id
-            JOIN nodes n            ON n.id = e.source_node_id
-            WHERE n.workflow_id = $1
+            WHERE EXISTS (
+                SELECT 1 FROM edge_conditions ec
+                JOIN edges e ON e.id = ec.edge_id
+                JOIN nodes n ON n.id = e.source_node_id
+                WHERE ec.condition_id = c.id AND n.workflow_id = $1
+            )
             ORDER BY c.created_at
             """,
             workflow_id,
@@ -111,11 +132,13 @@ class PostgresConditionRepository(ConditionRepository):
             return await self.get(condition_id)
         sets.append("updated_at = now()")
         pool = await self._database.get_pool()
-        row = await pool.fetchrow(
-            f"UPDATE conditions SET {', '.join(sets)} WHERE id = $1 RETURNING {_COLS}",
+        result = await pool.execute(
+            f"UPDATE conditions SET {', '.join(sets)} WHERE id = $1",
             *params,
         )
-        return _row_to_dict(row) if row else None
+        if result.split()[-1] == "0":
+            return None
+        return await self.get(condition_id)
 
     async def delete(self, condition_id: UUID) -> bool:
         pool = await self._database.get_pool()
