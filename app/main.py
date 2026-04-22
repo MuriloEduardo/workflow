@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from app.adapters.inbound.http.conditions_router import router as conditions_router
 from app.adapters.inbound.http.edges_router import router as edges_router
 from app.adapters.inbound.http.executions_router import router as executions_router
+from app.adapters.inbound.http.exception_handlers import register_exception_handlers
 from app.adapters.inbound.http.nodes_router import router as nodes_router
 from app.adapters.inbound.http.properties_router import router as properties_router
 from app.adapters.inbound.http.tenants_router import router as tenants_router
@@ -52,6 +53,8 @@ def parse_args() -> argparse.Namespace:
 def create_app(container: Container) -> FastAPI:
     app = FastAPI(title="Workflow Service")
     app.state.container = container
+
+    register_exception_handlers(app)
 
     @app.get("/health")
     async def health() -> dict:
