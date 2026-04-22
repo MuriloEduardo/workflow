@@ -4,7 +4,7 @@ from uuid import UUID
 from app.infrastructure.database.postgres_connection import PostgresConnection
 from app.ports.outbound.edge_repository import EdgeRepository
 
-_COLS = "id, source_node_id, target_node_id, label, condition, condition_prompt, priority, metadata, created_at, updated_at"
+_COLS = "id, source_node_id, target_node_id, label, priority, metadata, created_at, updated_at"
 
 
 def _row_to_dict(row: object) -> dict:
@@ -26,8 +26,6 @@ class PostgresEdgeRepository(EdgeRepository):
         source_node_id: UUID,
         target_node_id: UUID,
         label: str | None,
-        condition: dict | None,
-        condition_prompt: str | None,
         priority: int,
         metadata: dict,
     ) -> UUID:
@@ -35,15 +33,13 @@ class PostgresEdgeRepository(EdgeRepository):
         return await pool.fetchval(
             """
             INSERT INTO edges
-                (source_node_id, target_node_id, label, condition, condition_prompt, priority, metadata)
-            VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7::jsonb)
+                (source_node_id, target_node_id, label, priority, metadata)
+            VALUES ($1,$2,$3,$4,$5::jsonb)
             RETURNING id
             """,
             source_node_id,
             target_node_id,
             label,
-            json.dumps(condition) if condition is not None else None,
-            condition_prompt,
             priority,
             json.dumps(metadata),
         )
@@ -71,8 +67,8 @@ class PostgresEdgeRepository(EdgeRepository):
     async def update(self, edge_id: UUID, fields: dict) -> dict | None:
         if not fields:
             return await self.get(edge_id)
-        allowed = {"label", "condition", "condition_prompt", "priority", "metadata"}
-        json_cols = {"condition", "metadata"}
+        allowed = {"label", "priority", "metadata"}
+        json_cols = {"metadata"}
         sets, params = [], [edge_id]
         for key, val in fields.items():
             if key not in allowed:

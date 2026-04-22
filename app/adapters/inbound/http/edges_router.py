@@ -16,16 +16,12 @@ class EdgeCreate(BaseModel):
     source_node_id: UUID
     target_node_id: UUID
     label: str | None = None
-    condition: dict[str, Any] | None = None
-    condition_prompt: str | None = None
     priority: int = 0
     metadata: dict[str, Any] = {}
 
 
 class EdgeUpdate(BaseModel):
     label: str | None = None
-    condition: dict[str, Any] | None = None
-    condition_prompt: str | None = None
     priority: int | None = None
     metadata: dict[str, Any] | None = None
 
@@ -50,8 +46,6 @@ async def create_edge(body: EdgeCreate, repo=Depends(_repo)):
         source_node_id=body.source_node_id,
         target_node_id=body.target_node_id,
         label=body.label,
-        condition=body.condition,
-        condition_prompt=body.condition_prompt,
         priority=body.priority,
         metadata=body.metadata,
     )

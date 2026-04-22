@@ -68,8 +68,7 @@ class Node(BaseModel):
     A single step inside a funnel definition.
 
     Represents a state/action in the workflow where cognition is called or decisions are made.
-    Each node can have properties (schema fields) that define what data to extract.
-    Supports different node types (extraction, evaluation, writing, etc.).
+    Each node can have properties linked via the node_properties N:N junction table.
     """
 
     id: str
@@ -107,7 +106,7 @@ class Edge(BaseModel):
     One source node may have many outgoing edges.
     Each edge has exactly one source and one target node.
 
-    Edges can have conditions that determine whether the transition should be taken.
+    Conditions are linked via the edge_conditions N:N junction table.
     Multiple edges from the same source are evaluated by priority (lower = higher priority).
     """
 
@@ -117,10 +116,6 @@ class Edge(BaseModel):
 
     # Human-readable label/description
     label: str | None = None
-
-    # Routing logic
-    condition: dict[str, Any] | None = None  # optional routing condition/rules
-    condition_prompt: str | None = None  # natural language condition for LLM evaluation
 
     # Priority for edge evaluation (lower number = higher priority)
     priority: int = 0

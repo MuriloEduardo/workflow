@@ -9,8 +9,6 @@ class EdgeRepository(ABC):
         source_node_id: UUID,
         target_node_id: UUID,
         label: str | None,
-        condition: dict | None,
-        condition_prompt: str | None,
         priority: int,
         metadata: dict,
     ) -> UUID:
