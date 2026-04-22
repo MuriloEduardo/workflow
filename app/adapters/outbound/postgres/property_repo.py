@@ -12,6 +12,9 @@ def _row_to_dict(row: object) -> dict:
     d["id"] = str(d["id"])
     d["created_at"] = d["created_at"].isoformat()
     d["updated_at"] = d["updated_at"].isoformat()
+    for field in ("default_value", "schema", "metadata"):
+        if isinstance(d.get(field), str):
+            d[field] = json.loads(d[field])
     return d
 
 

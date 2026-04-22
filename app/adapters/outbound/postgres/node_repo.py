@@ -12,6 +12,9 @@ def _row_to_dict(row: object) -> dict:
     d["id"] = str(d["id"])
     d["created_at"] = d["created_at"].isoformat()
     d["updated_at"] = d["updated_at"].isoformat()
+    for field in ("response_format", "config", "metadata"):
+        if isinstance(d.get(field), str):
+            d[field] = json.loads(d[field])
     return d
 
 
@@ -141,6 +144,11 @@ class PostgresNodeRepository(NodeRepository):
         d["id"] = str(d["id"])
         d["created_at"] = d["created_at"].isoformat()
         d["updated_at"] = d["updated_at"].isoformat()
+        for field in ("response_format", "config", "metadata"):
+            if isinstance(d.get(field), str):
+                d[field] = json.loads(d[field])
+        if isinstance(d.get("properties"), str):
+            d["properties"] = json.loads(d["properties"])
         return d
 
     async def get_full(self, node_id: UUID) -> dict | None:

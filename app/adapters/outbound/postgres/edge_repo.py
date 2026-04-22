@@ -14,6 +14,8 @@ def _row_to_dict(row: object) -> dict:
     d["target_node_id"] = str(d["target_node_id"])
     d["created_at"] = d["created_at"].isoformat()
     d["updated_at"] = d["updated_at"].isoformat()
+    if isinstance(d.get("metadata"), str):
+        d["metadata"] = json.loads(d["metadata"])
     return d
 
 
@@ -150,6 +152,10 @@ class PostgresEdgeRepository(EdgeRepository):
         d["target_node_id"] = str(d["target_node_id"])
         d["created_at"] = d["created_at"].isoformat()
         d["updated_at"] = d["updated_at"].isoformat()
+        if isinstance(d.get("metadata"), str):
+            d["metadata"] = json.loads(d["metadata"])
+        if isinstance(d.get("conditions"), str):
+            d["conditions"] = json.loads(d["conditions"])
         return d
 
     async def get_full(self, edge_id: UUID) -> dict | None:
