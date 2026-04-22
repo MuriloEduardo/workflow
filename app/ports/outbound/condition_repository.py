@@ -6,6 +6,7 @@ class ConditionRepository(ABC):
     @abstractmethod
     async def create(
         self,
+        workflow_id: UUID | None,
         operator: str,
         compare_value: object | None,
         prompt: str | None,
@@ -24,6 +25,11 @@ class ConditionRepository(ABC):
 
     @abstractmethod
     async def list_by_edge(self, edge_id: UUID) -> list[dict]:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def list_by_workflow(self, workflow_id: UUID) -> list[dict]:
+        """Returns all conditions belonging to a workflow."""
         raise NotImplementedError
 
     @abstractmethod

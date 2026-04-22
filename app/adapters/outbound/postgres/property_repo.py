@@ -4,12 +4,13 @@ from uuid import UUID
 from app.infrastructure.database.postgres_connection import PostgresConnection
 from app.ports.outbound.property_repository import PropertyRepository
 
-_COLS = "id, name, type, description, required, default_value, schema, metadata, created_at, updated_at"
+_COLS = "id, workflow_id, name, type, description, required, default_value, schema, metadata, created_at, updated_at"
 
 
 def _row_to_dict(row: object) -> dict:
     d = dict(row)
     d["id"] = str(d["id"])
+    d["workflow_id"] = str(d["workflow_id"]) if d.get("workflow_id") else None
     d["created_at"] = d["created_at"].isoformat()
     d["updated_at"] = d["updated_at"].isoformat()
     for field in ("default_value", "schema", "metadata"):
@@ -24,6 +25,7 @@ class PostgresPropertyRepository(PropertyRepository):
 
     async def create(
         self,
+        workflow_id: UUID | None,
         name: str,
         type: str,
         description: str | None,
@@ -35,10 +37,11 @@ class PostgresPropertyRepository(PropertyRepository):
         pool = await self._database.get_pool()
         return await pool.fetchval(
             """
-            INSERT INTO properties (name, type, description, required, default_value, schema, metadata)
-            VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7::jsonb)
+            INSERT INTO properties (workflow_id, name, type, description, required, default_value, schema, metadata)
+            VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8::jsonb)
             RETURNING id
             """,
+            workflow_id,
             name,
             type,
             description,
@@ -96,6 +99,14 @@ class PostgresPropertyRepository(PropertyRepository):
         pool = await self._database.get_pool()
         result = await pool.execute("DELETE FROM properties WHERE id = $1", property_id)
         return result.split()[-1] != "0"
+
+    async def list_by_workflow(self, workflow_id: UUID) -> list[dict]:
+        pool = await self._database.get_pool()
+        rows = await pool.fetch(
+            f"SELECT {_COLS} FROM properties WHERE workflow_id = $1 ORDER BY name",
+            workflow_id,
+        )
+        return [_row_to_dict(r) for r in rows]
 
     # ------------------------------------------------------------------
     # Node ↔ Property junction

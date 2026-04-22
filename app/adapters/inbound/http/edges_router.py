@@ -13,6 +13,7 @@ router = APIRouter(prefix="/edges", tags=["edges"])
 
 
 class EdgeCreate(BaseModel):
+    workflow_id: UUID | None = None
     source_node_id: UUID
     target_node_id: UUID
     label: str | None = None
@@ -43,6 +44,7 @@ def _repo(request: Request):
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_edge(body: EdgeCreate, repo=Depends(_repo)):
     edge_id = await repo.create(
+        workflow_id=body.workflow_id,
         source_node_id=body.source_node_id,
         target_node_id=body.target_node_id,
         label=body.label,
@@ -53,9 +55,15 @@ async def create_edge(body: EdgeCreate, repo=Depends(_repo)):
 
 
 @router.get("")
-async def list_edges(source_node_id: UUID | None = None, repo=Depends(_repo)):
+async def list_edges(
+    source_node_id: UUID | None = None,
+    workflow_id: UUID | None = None,
+    repo=Depends(_repo),
+):
     if source_node_id is not None:
         return await repo.list_by_source_full(source_node_id)
+    if workflow_id is not None:
+        return await repo.list_by_workflow(workflow_id)
     return await repo.list_all_full()
 
 

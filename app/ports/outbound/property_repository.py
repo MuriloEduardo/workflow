@@ -6,6 +6,7 @@ class PropertyRepository(ABC):
     @abstractmethod
     async def create(
         self,
+        workflow_id: UUID | None,
         name: str,
         type: str,
         description: str | None,
@@ -46,4 +47,9 @@ class PropertyRepository(ABC):
 
     @abstractmethod
     async def list_by_node(self, node_id: UUID) -> list[dict]:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def list_by_workflow(self, workflow_id: UUID) -> list[dict]:
+        """Returns all properties belonging to a workflow."""
         raise NotImplementedError

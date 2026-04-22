@@ -7,6 +7,11 @@ Executions record cognition call results produced during a node activation.
 
 Cardinality:
   - Tenant        1 ── N  TenantContact
+  - Tenant        1 ── N  Workflow
+  - Workflow      1 ── N  Node
+  - Workflow      1 ── N  Edge
+  - Workflow      1 ── N  Property
+  - Workflow      1 ── N  Condition
   - Node          1 ── N  Edge  (as source)
   - Node          1 ── N  Edge  (as target)
   - Edge          N ── 1  Node  (source_node_id)
@@ -24,6 +29,24 @@ from __future__ import annotations
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+# ---------------------------------------------------------------------------
+# Workflow
+# ---------------------------------------------------------------------------
+
+
+class Workflow(BaseModel):
+    """A named workflow definition scoped to a tenant."""
+
+    id: str
+    tenant_id: str
+    name: str
+    description: str | None = None
+    status: str = "active"
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: str
+    updated_at: str
+
 
 # ---------------------------------------------------------------------------
 # Tenant
@@ -72,6 +95,7 @@ class Node(BaseModel):
     """
 
     id: str
+    workflow_id: str | None = None
     name: str
     description: str | None = None
     status: str = "active"
@@ -111,6 +135,7 @@ class Edge(BaseModel):
     """
 
     id: str
+    workflow_id: str | None = None
     source_node_id: str
     target_node_id: str
 
@@ -141,6 +166,7 @@ class Property(BaseModel):
     """
 
     id: str
+    workflow_id: str | None = None
     name: str
     type: str  # string, integer, boolean, array, object, etc.
     description: str | None = None
@@ -171,6 +197,7 @@ class Condition(BaseModel):
     """
 
     id: str
+    workflow_id: str | None = None
 
     # Condition logic
     operator: str  # eq, neq, contains, gt, lt, exists, is_null, etc.

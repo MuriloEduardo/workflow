@@ -6,6 +6,7 @@ class EdgeRepository(ABC):
     @abstractmethod
     async def create(
         self,
+        workflow_id: UUID | None,
         source_node_id: UUID,
         target_node_id: UUID,
         label: str | None,
@@ -47,4 +48,9 @@ class EdgeRepository(ABC):
     @abstractmethod
     async def list_by_source_full(self, source_node_id: UUID) -> list[dict]:
         """Returns edges by source node with embedded conditions and their properties."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def list_by_workflow(self, workflow_id: UUID) -> list[dict]:
+        """Returns all edges (full) belonging to a workflow."""
         raise NotImplementedError

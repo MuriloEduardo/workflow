@@ -12,6 +12,7 @@ from app.adapters.outbound.postgres.pending_message_repo import (
 from app.adapters.outbound.postgres.property_repo import PostgresPropertyRepository
 from app.adapters.outbound.postgres.session_repo import PostgresSessionRepository
 from app.adapters.outbound.postgres.tenant_repo import PostgresTenantRepository
+from app.adapters.outbound.postgres.workflow_repo import PostgresWorkflowRepository
 from app.domain.services.debounce import DebounceService
 from app.domain.services.session import SessionService
 from app.ports.outbound.condition_repository import ConditionRepository
@@ -20,6 +21,7 @@ from app.ports.outbound.execution_repository import ExecutionRepository
 from app.ports.outbound.node_repository import NodeRepository
 from app.ports.outbound.property_repository import PropertyRepository
 from app.ports.outbound.tenant_repository import TenantRepository
+from app.ports.outbound.workflow_repository import WorkflowRepository
 from app.infrastructure.config.settings import Settings
 from app.infrastructure.database.postgres_connection import PostgresConnection
 from app.infrastructure.messaging.rabbitmq_connection import RabbitMQConnection
@@ -42,6 +44,7 @@ class Container:
         self._edge_repo: EdgeRepository | None = None
         self._property_repo: PropertyRepository | None = None
         self._condition_repo: ConditionRepository | None = None
+        self._workflow_repo: WorkflowRepository | None = None
 
     @property
     def connection(self) -> RabbitMQConnection:
@@ -119,6 +122,12 @@ class Container:
         if self._condition_repo is None:
             self._condition_repo = PostgresConditionRepository(self.database)
         return self._condition_repo
+
+    @property
+    def workflow_repo(self) -> WorkflowRepository:
+        if self._workflow_repo is None:
+            self._workflow_repo = PostgresWorkflowRepository(self.database)
+        return self._workflow_repo
 
     def consumer(self, handler: MessageHandler) -> RabbitMQConsumer:
         return RabbitMQConsumer(self.connection, handler)

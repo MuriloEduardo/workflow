@@ -4,12 +4,13 @@ from uuid import UUID
 from app.infrastructure.database.postgres_connection import PostgresConnection
 from app.ports.outbound.edge_repository import EdgeRepository
 
-_COLS = "id, source_node_id, target_node_id, label, priority, metadata, created_at, updated_at"
+_COLS = "id, workflow_id, source_node_id, target_node_id, label, priority, metadata, created_at, updated_at"
 
 
 def _row_to_dict(row: object) -> dict:
     d = dict(row)
     d["id"] = str(d["id"])
+    d["workflow_id"] = str(d["workflow_id"]) if d.get("workflow_id") else None
     d["source_node_id"] = str(d["source_node_id"])
     d["target_node_id"] = str(d["target_node_id"])
     d["created_at"] = d["created_at"].isoformat()
@@ -25,6 +26,7 @@ class PostgresEdgeRepository(EdgeRepository):
 
     async def create(
         self,
+        workflow_id: UUID | None,
         source_node_id: UUID,
         target_node_id: UUID,
         label: str | None,
@@ -35,10 +37,11 @@ class PostgresEdgeRepository(EdgeRepository):
         return await pool.fetchval(
             """
             INSERT INTO edges
-                (source_node_id, target_node_id, label, priority, metadata)
-            VALUES ($1,$2,$3,$4,$5::jsonb)
+                (workflow_id, source_node_id, target_node_id, label, priority, metadata)
+            VALUES ($1,$2,$3,$4,$5,$6::jsonb)
             RETURNING id
             """,
+            workflow_id,
             source_node_id,
             target_node_id,
             label,
@@ -141,13 +144,14 @@ class PostgresEdgeRepository(EdgeRepository):
     """
 
     _FULL_GROUP = (
-        "e.id, e.source_node_id, e.target_node_id, e.label, "
+        "e.id, e.workflow_id, e.source_node_id, e.target_node_id, e.label, "
         "e.priority, e.metadata, e.created_at, e.updated_at"
     )
 
     def _full_row_to_dict(self, row) -> dict:
         d = dict(row)
         d["id"] = str(d["id"])
+        d["workflow_id"] = str(d["workflow_id"]) if d.get("workflow_id") else None
         d["source_node_id"] = str(d["source_node_id"])
         d["target_node_id"] = str(d["target_node_id"])
         d["created_at"] = d["created_at"].isoformat()

@@ -4,12 +4,13 @@ from uuid import UUID
 from app.infrastructure.database.postgres_connection import PostgresConnection
 from app.ports.outbound.node_repository import NodeRepository
 
-_COLS = 'id, name, description, status, prompt, response_format, config, metadata, "order", priority, created_at, updated_at'
+_COLS = 'id, workflow_id, name, description, status, prompt, response_format, config, metadata, "order", priority, created_at, updated_at'
 
 
 def _row_to_dict(row: object) -> dict:
     d = dict(row)
     d["id"] = str(d["id"])
+    d["workflow_id"] = str(d["workflow_id"]) if d.get("workflow_id") else None
     d["created_at"] = d["created_at"].isoformat()
     d["updated_at"] = d["updated_at"].isoformat()
     for field in ("response_format", "config", "metadata"):
@@ -24,6 +25,7 @@ class PostgresNodeRepository(NodeRepository):
 
     async def create(
         self,
+        workflow_id: UUID | None,
         name: str,
         description: str | None,
         status: str,
@@ -38,11 +40,12 @@ class PostgresNodeRepository(NodeRepository):
         return await pool.fetchval(
             """
             INSERT INTO nodes
-                (name, description, status, prompt, response_format,
+                (workflow_id, name, description, status, prompt, response_format,
                  config, metadata, "order", priority)
-            VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7::jsonb,$8,$9)
+            VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8::jsonb,$9,$10)
             RETURNING id
             """,
+            workflow_id,
             name,
             description,
             status,
@@ -134,7 +137,7 @@ class PostgresNodeRepository(NodeRepository):
     """
 
     _FULL_GROUP = (
-        "n.id, n.name, n.description, n.status, n.prompt, "
+        "n.id, n.workflow_id, n.name, n.description, n.status, n.prompt, "
         'n.response_format, n.config, n.metadata, n."order", n.priority, '
         "n.created_at, n.updated_at"
     )
@@ -142,6 +145,7 @@ class PostgresNodeRepository(NodeRepository):
     def _full_row_to_dict(self, row) -> dict:
         d = dict(row)
         d["id"] = str(d["id"])
+        d["workflow_id"] = str(d["workflow_id"]) if d.get("workflow_id") else None
         d["created_at"] = d["created_at"].isoformat()
         d["updated_at"] = d["updated_at"].isoformat()
         for field in ("response_format", "config", "metadata"):
@@ -175,5 +179,20 @@ class PostgresNodeRepository(NodeRepository):
             GROUP BY {self._FULL_GROUP}
             ORDER BY n."order" NULLS LAST, n.created_at
             """
+        )
+        return [self._full_row_to_dict(r) for r in rows]
+
+    async def list_by_workflow(self, workflow_id: UUID) -> list[dict]:
+        pool = await self._database.get_pool()
+        rows = await pool.fetch(
+            f"""
+            SELECT {self._FULL_GROUP}, {self._FULL_PROPS}
+            FROM nodes n
+            {self._FULL_JOINS}
+            WHERE n.workflow_id = $1
+            GROUP BY {self._FULL_GROUP}
+            ORDER BY n."order" NULLS LAST, n.created_at
+            """,
+            workflow_id,
         )
         return [self._full_row_to_dict(r) for r in rows]

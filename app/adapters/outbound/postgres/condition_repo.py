@@ -4,12 +4,13 @@ from uuid import UUID
 from app.infrastructure.database.postgres_connection import PostgresConnection
 from app.ports.outbound.condition_repository import ConditionRepository
 
-_COLS = "id, operator, compare_value, prompt, logic_operator, metadata, created_at, updated_at"
+_COLS = "id, workflow_id, operator, compare_value, prompt, logic_operator, metadata, created_at, updated_at"
 
 
 def _row_to_dict(row: object) -> dict:
     d = dict(row)
     d["id"] = str(d["id"])
+    d["workflow_id"] = str(d["workflow_id"]) if d.get("workflow_id") else None
     d["created_at"] = d["created_at"].isoformat()
     d["updated_at"] = d["updated_at"].isoformat()
     for field in ("compare_value", "metadata"):
@@ -24,6 +25,7 @@ class PostgresConditionRepository(ConditionRepository):
 
     async def create(
         self,
+        workflow_id: UUID | None,
         operator: str,
         compare_value: object | None,
         prompt: str | None,
@@ -34,10 +36,11 @@ class PostgresConditionRepository(ConditionRepository):
         return await pool.fetchval(
             """
             INSERT INTO conditions
-                (operator, compare_value, prompt, logic_operator, metadata)
-            VALUES ($1,$2::jsonb,$3,$4,$5::jsonb)
+                (workflow_id, operator, compare_value, prompt, logic_operator, metadata)
+            VALUES ($1,$2,$3::jsonb,$4,$5,$6::jsonb)
             RETURNING id
             """,
+            workflow_id,
             operator,
             json.dumps(compare_value) if compare_value is not None else None,
             prompt,
@@ -68,6 +71,14 @@ class PostgresConditionRepository(ConditionRepository):
             ORDER BY c.created_at
             """,
             edge_id,
+        )
+        return [_row_to_dict(r) for r in rows]
+
+    async def list_by_workflow(self, workflow_id: UUID) -> list[dict]:
+        pool = await self._database.get_pool()
+        rows = await pool.fetch(
+            f"SELECT {_COLS} FROM conditions WHERE workflow_id = $1 ORDER BY created_at",
+            workflow_id,
         )
         return [_row_to_dict(r) for r in rows]
 

@@ -13,6 +13,7 @@ router = APIRouter(prefix="/conditions", tags=["conditions"])
 
 
 class ConditionCreate(BaseModel):
+    workflow_id: UUID | None = None
     operator: str
     compare_value: Any | None = None
     prompt: str | None = None
@@ -45,6 +46,7 @@ def _repo(request: Request):
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_condition(body: ConditionCreate, repo=Depends(_repo)):
     condition_id = await repo.create(
+        workflow_id=body.workflow_id,
         operator=body.operator,
         compare_value=body.compare_value,
         prompt=body.prompt,
@@ -55,9 +57,15 @@ async def create_condition(body: ConditionCreate, repo=Depends(_repo)):
 
 
 @router.get("")
-async def list_conditions(edge_id: UUID | None = None, repo=Depends(_repo)):
+async def list_conditions(
+    edge_id: UUID | None = None,
+    workflow_id: UUID | None = None,
+    repo=Depends(_repo),
+):
     if edge_id is not None:
         return await repo.list_by_edge(edge_id)
+    if workflow_id is not None:
+        return await repo.list_by_workflow(workflow_id)
     return await repo.list_all()
 
 

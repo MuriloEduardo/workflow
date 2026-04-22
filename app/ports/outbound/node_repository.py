@@ -6,6 +6,7 @@ class NodeRepository(ABC):
     @abstractmethod
     async def create(
         self,
+        workflow_id: UUID | None,
         name: str,
         description: str | None,
         status: str,
@@ -42,4 +43,9 @@ class NodeRepository(ABC):
     @abstractmethod
     async def list_all_full(self) -> list[dict]:
         """Returns all nodes with embedded properties list."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def list_by_workflow(self, workflow_id: UUID) -> list[dict]:
+        """Returns all nodes (full) belonging to a workflow."""
         raise NotImplementedError

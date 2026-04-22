@@ -13,6 +13,7 @@ router = APIRouter(prefix="/nodes", tags=["nodes"])
 
 
 class NodeCreate(BaseModel):
+    workflow_id: UUID | None = None
     name: str
     description: str | None = None
     status: str = "active"
@@ -57,6 +58,7 @@ def _property_repo(request: Request):
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_node(body: NodeCreate, repo=Depends(_repo)):
     node_id = await repo.create(
+        workflow_id=body.workflow_id,
         name=body.name,
         description=body.description,
         status=body.status,
@@ -72,7 +74,9 @@ async def create_node(body: NodeCreate, repo=Depends(_repo)):
 
 
 @router.get("")
-async def list_nodes(repo=Depends(_repo)):
+async def list_nodes(workflow_id: UUID | None = None, repo=Depends(_repo)):
+    if workflow_id is not None:
+        return await repo.list_by_workflow(workflow_id)
     return await repo.list_all_full()
 
 
