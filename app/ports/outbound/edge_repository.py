@@ -6,7 +6,6 @@ class EdgeRepository(ABC):
     @abstractmethod
     async def create(
         self,
-        workflow_id: UUID | None,
         source_node_id: UUID,
         target_node_id: UUID,
         label: str | None,
